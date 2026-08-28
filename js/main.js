@@ -106,9 +106,18 @@ OBSTACLE_TYPES.forEach((type) => {
   const input = document.createElement('input');
   input.type = 'checkbox';
   input.addEventListener('change', () => {
+    const scenario = SCENARIOS.find((s) => s.id === currentScenarioId);
     const selection = obstacleSelections.get(currentScenarioId);
-    if (input.checked) selection.add(type.id);
-    else selection.delete(type.id);
+    if (input.checked) {
+      selection.add(type.id);
+    } else {
+      // Cenário de parada exige bloqueio: não permite desmarcar o último obstáculo.
+      if (scenario.requireObstacle && selection.size === 1 && selection.has(type.id)) {
+        input.checked = true;
+        return;
+      }
+      selection.delete(type.id);
+    }
     rebuildScenario();
   });
   const text = document.createElement('span');
@@ -189,6 +198,12 @@ function selectScenario(id) {
   const scenario = SCENARIOS.find((s) => s.id === id);
   if (!scenario) return;
   currentScenarioId = id;
+  // Ao entrar num cenário com o seletor vazio, reaplica os obstáculos padrão
+  // dele — assim sempre "já vem algo marcado" ao escolher o cenário.
+  const selection = obstacleSelections.get(id);
+  if (scenario.obstacleSlots && selection.size === 0) {
+    (scenario.defaultObstacles || []).forEach((t) => selection.add(t));
+  }
   syncObstacleChecks(scenario);
   rebuildScenario();
   scenarioButtons.forEach((btn, key) => btn.classList.toggle('active', key === id));

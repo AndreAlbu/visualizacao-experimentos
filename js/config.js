@@ -92,7 +92,7 @@ export const START_DEFAULT = { x: 0, z: 2 };
 export const SCENARIOS = [
   {
     id: 'desvio-esquerda',
-    label: 'Desvio à esquerda — mesa',
+    label: 'Desvio à esquerda',
     speed: WALK_SPEED,
     path: [
       [0, 0, 2], [0, 0, 8], [0, 0, 12],
@@ -115,7 +115,7 @@ export const SCENARIOS = [
   },
   {
     id: 'desvio-direita',
-    label: 'Desvio à direita — duas pessoas',
+    label: 'Desvio à direita',
     speed: WALK_SPEED,
     path: [
       [0, 0, 2], [0, 0, 8], [0, 0, 12],
@@ -136,7 +136,8 @@ export const SCENARIOS = [
   },
   {
     id: 'aproximacao-parada',
-    label: 'Aproximação e parada — sem desvio',
+    label: 'Parada',
+    requireObstacle: true, // a parada só existe se houver bloqueio: sempre ao menos 1 obstáculo
     speed: WALK_SPEED,
     path: [
       [0, 0, 2], [0, 0, 6], [0, 0, 10], [0, 0, 12],
@@ -155,7 +156,7 @@ export const SCENARIOS = [
   },
   {
     id: 'caminhada-livre',
-    label: 'Caminhada livre — sem obstáculo',
+    label: 'Caminho livre',
     speed: 1.7, // caminhada livre: ritmo mais acelerado
     path: [
       [0, 0, 2], [0, 0, 12], [0, 0, 24], [0, 0, 36],
