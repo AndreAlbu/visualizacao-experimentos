@@ -54,10 +54,8 @@ const scenarioManager = createScenarioManager(scene);
 buildLegend(document.getElementById('legend-panel'));
 
 const viewButtons = {
-  overview: document.getElementById('btn-view-overview'),
   egocentric: document.getElementById('btn-view-egocentric'),
   top: document.getElementById('btn-view-top'),
-  lateral: document.getElementById('btn-view-lateral'),
 };
 const viewControls = setupViewControls({ camera, controls, buttons: viewButtons, participantGroup: participant.group, ceiling });
 
