@@ -84,7 +84,9 @@ export const OBSTACLE_TYPES = [
 ];
 
 // Limites do controle de posição inicial do participante (metros).
-export const START_LIMITS = { x: [-2, 2], z: [0.5, 5.5] };
+// O X desloca a faixa inteira do experimento (trajetória + obstáculos);
+// limitado a ±1 m para o desvio (±1,5 m) não invadir as estantes.
+export const START_LIMITS = { x: [-1, 1], z: [0.5, 5.5] };
 export const START_DEFAULT = { x: 0, z: 2 };
 
 export const SCENARIOS = [

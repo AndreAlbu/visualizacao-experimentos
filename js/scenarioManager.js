@@ -23,21 +23,35 @@ function disposeGroup(scene, group) {
 }
 
 // Aplica as opções do usuário sobre a definição base do cenário:
-// - `start` ({x, z}) substitui o primeiro ponto do trajeto e o marcador START;
+// - `start.x` desloca lateralmente a FAIXA inteira do experimento (trajetória,
+//   linha-fantasma, zona de risco, obstáculos e marcadores): o participante
+//   sempre caminha reto à frente a partir de onde começa, com o obstáculo no
+//   seu caminho, e então desvia;
+// - `start.z` ajusta apenas a distância do ponto de partida até o obstáculo;
 // - `types` (ids de OBSTACLE_TYPES) preenche os slots de obstáculo do cenário.
 function effectiveScenario(scenario, options = {}) {
-  const path = scenario.path.map((p) => [...p]);
-  let markers = scenario.markers;
+  const laneX = options.start ? options.start.x : 0;
+
+  // Toda a geometria base é definida na faixa central (x = 0) e transladada
+  // lateralmente por laneX.
+  const path = scenario.path.map((p) => [p[0] + laneX, p[1], p[2]]);
+  let markers = scenario.markers.map((m) => ({ ...m, pos: [m.pos[0] + laneX, m.pos[1], m.pos[2]] }));
+  const ghost = scenario.ghost
+    ? scenario.ghost.map((p) => [p[0] + laneX, p[1], p[2]])
+    : undefined;
+  const risk = scenario.risk
+    ? { ...scenario.risk, center: [scenario.risk.center[0] + laneX, scenario.risk.center[1], scenario.risk.center[2]] }
+    : undefined;
 
   if (options.start) {
-    const { x, z } = options.start;
-    path[0] = [x, 0, z];
-    markers = markers.map((m) => (m.id === 'START' ? { ...m, pos: [x, 0, z] } : m));
+    const { z } = options.start;
+    path[0] = [laneX, 0, z];
+    markers = markers.map((m) => (m.id === 'START' ? { ...m, pos: [laneX, 0, z] } : m));
   }
 
   let obstacles = [];
-  if (scenario.obstacleSlots && scenario.risk && options.types && options.types.length) {
-    const [cx, , cz] = scenario.risk.center;
+  if (scenario.obstacleSlots && risk && options.types && options.types.length) {
+    const [cx, , cz] = risk.center;
     obstacles = options.types.slice(0, scenario.obstacleSlots.length).map((type, i) => {
       const [dx, dz] = scenario.obstacleSlots[i];
       return {
@@ -49,7 +63,7 @@ function effectiveScenario(scenario, options = {}) {
     });
   }
 
-  return { ...scenario, path, markers, obstacles };
+  return { ...scenario, path, markers, ghost, risk, obstacles };
 }
 
 // Gerencia o cenário ativo: constrói trajetória, zona de risco e obstáculos
