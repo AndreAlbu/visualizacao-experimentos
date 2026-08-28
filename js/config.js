@@ -72,6 +72,21 @@ export const WALK_SPEED = 1.15; // m/s (ritmo normal de caminhada)
 export const SLOW_SPEED = 0.45; // m/s (aproximação cautelosa do obstáculo)
 export const SLOW_RADIUS = 4.5; // m (raio de influência da desaceleração)
 
+// Tipos de obstáculo disponíveis no seletor (a ordem define a prioridade de
+// preenchimento das posições/slots do cenário).
+export const OBSTACLE_TYPES = [
+  { id: 'mesa', label: 'Mesa' },
+  { id: 'duas-pessoas', label: 'Duas pessoas' },
+  { id: 'pessoa', label: 'Uma pessoa' },
+  { id: 'caixa', label: 'Caixa' },
+  { id: 'cadeira', label: 'Cadeira' },
+  { id: 'carrinho', label: 'Carrinho' },
+];
+
+// Limites do controle de posição inicial do participante (metros).
+export const START_LIMITS = { x: [-2, 2], z: [0.5, 5.5] };
+export const START_DEFAULT = { x: 0, z: 2 };
+
 export const SCENARIOS = [
   {
     id: 'desvio-esquerda',
@@ -85,9 +100,10 @@ export const SCENARIOS = [
     ghost: [[0, 0, 12], [0, 0, 19.5]], // curso original que atravessaria a mesa
     detourZ: [12.3, 17.7], // faixa da trajetória destacada como desvio
     risk: { center: [0, 0, 15], radius: 1.8 },
-    obstacles: [
-      { type: 'desk', pos: [0, 0, 15], rotY: 0.15, label: 'Obstáculo (mesa)' },
-    ],
+    // Slots (offsets x/z relativos ao centro da zona de risco) preenchidos
+    // pelos tipos de obstáculo selecionados no painel.
+    obstacleSlots: [[0, 0], [0.7, -0.7], [-0.7, 0.7], [0.5, 0.9], [-0.5, -0.9]],
+    defaultObstacles: ['mesa'],
     markers: [
       { id: 'START', pos: [0, 0, 2] },
       { id: 'T1', pos: [0, 0, 12] },
@@ -107,10 +123,8 @@ export const SCENARIOS = [
     ghost: [[0, 0, 12], [0, 0, 19.5]],
     detourZ: [12.3, 17.7],
     risk: { center: [0, 0, 15], radius: 1.8 },
-    obstacles: [
-      { type: 'person', pos: [0.5, 0, 14.9], rotY: 2.6, label: 'Obstáculo (pessoas)' },
-      { type: 'person', pos: [-0.3, 0, 15.1], rotY: 3.6 },
-    ],
+    obstacleSlots: [[0, 0], [0.7, -0.7], [-0.7, 0.7], [0.5, 0.9], [-0.5, -0.9]],
+    defaultObstacles: ['duas-pessoas'],
     markers: [
       { id: 'START', pos: [0, 0, 2] },
       { id: 'T1', pos: [0, 0, 12] },
@@ -127,11 +141,10 @@ export const SCENARIOS = [
     ],
     stop: true, // o corredor está bloqueado: o participante para ~2 m antes
     risk: { center: [0, 0, 14], radius: 1.8 },
-    obstacles: [
-      { type: 'desk', pos: [-1.3, 0, 14.1], rotY: 0, label: 'Obstáculo (corredor bloqueado)' },
-      { type: 'person', pos: [0.2, 0, 14], rotY: Math.PI },
-      { type: 'person', pos: [1.2, 0, 14.05], rotY: Math.PI + 0.4 },
-    ],
+    // Slots distribuídos pela largura do corredor (bloqueio da passagem).
+    obstacleSlots: [[-1.3, 0.1], [0.5, 0], [1.5, 0.1], [-0.5, 0.8], [1.0, 0.9]],
+    obstacleLabel: 'Obstáculo (corredor bloqueado)',
+    defaultObstacles: ['mesa', 'duas-pessoas', 'pessoa'],
     markers: [
       { id: 'START', pos: [0, 0, 2] },
       { id: 'T1', pos: [0, 0, 10] },
@@ -145,7 +158,7 @@ export const SCENARIOS = [
     path: [
       [0, 0, 2], [0, 0, 12], [0, 0, 24], [0, 0, 36],
     ],
-    obstacles: [],
+    defaultObstacles: [], // corredor livre: seleção de obstáculos desabilitada
     markers: [
       { id: 'START', pos: [0, 0, 2] },
       { id: 'END', pos: [0, 0, 36] },

@@ -22,19 +22,51 @@ function disposeGroup(scene, group) {
   scene.remove(group);
 }
 
+// Aplica as opções do usuário sobre a definição base do cenário:
+// - `start` ({x, z}) substitui o primeiro ponto do trajeto e o marcador START;
+// - `types` (ids de OBSTACLE_TYPES) preenche os slots de obstáculo do cenário.
+function effectiveScenario(scenario, options = {}) {
+  const path = scenario.path.map((p) => [...p]);
+  let markers = scenario.markers;
+
+  if (options.start) {
+    const { x, z } = options.start;
+    path[0] = [x, 0, z];
+    markers = markers.map((m) => (m.id === 'START' ? { ...m, pos: [x, 0, z] } : m));
+  }
+
+  let obstacles = [];
+  if (scenario.obstacleSlots && scenario.risk && options.types && options.types.length) {
+    const [cx, , cz] = scenario.risk.center;
+    obstacles = options.types.slice(0, scenario.obstacleSlots.length).map((type, i) => {
+      const [dx, dz] = scenario.obstacleSlots[i];
+      return {
+        type,
+        pos: [cx + dx, 0, cz + dz],
+        rotY: (i * 1.3) % 1.6 - 0.8, // leve variação de orientação por slot
+        label: i === 0 ? (scenario.obstacleLabel || 'Obstáculo') : undefined,
+      };
+    });
+  }
+
+  return { ...scenario, path, markers, obstacles };
+}
+
 // Gerencia o cenário ativo: constrói trajetória, zona de risco e obstáculos
-// num grupo próprio e o substitui por completo a cada troca de cenário.
+// num grupo próprio e o substitui por completo a cada troca de cenário ou
+// alteração das opções (obstáculos selecionados / posição inicial).
 export function createScenarioManager(scene) {
   let currentGroup = null;
 
-  function load(scenario) {
+  function load(scenario, options) {
     if (currentGroup) disposeGroup(scene, currentGroup);
     currentGroup = new THREE.Group();
     currentGroup.name = `scenario-${scenario.id}`;
 
-    const { curve } = buildTrajectory(currentGroup, scenario);
-    const riskZone = scenario.risk ? buildRiskZone(currentGroup, scenario.risk) : null;
-    buildScenarioObstacles(currentGroup, scenario);
+    const resolved = effectiveScenario(scenario, options);
+    const { curve } = buildTrajectory(currentGroup, resolved);
+    const riskZone = resolved.risk ? buildRiskZone(currentGroup, resolved.risk) : null;
+    buildScenarioObstacles(currentGroup, resolved);
 
     scene.add(currentGroup);
     return { curve, riskZone };

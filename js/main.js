@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 
-import { COLORS, SCENARIOS } from './config.js';
+import { COLORS, SCENARIOS, OBSTACLE_TYPES, START_LIMITS, START_DEFAULT } from './config.js';
 import { buildEnvironment } from './environment.js';
 import { createParticipant } from './participant.js';
 import { buildDecor } from './obstacles.js';
@@ -71,7 +71,7 @@ const animationApi = setupAnimationController({
   },
 });
 
-// --- Menu de cenários de navegação -------------------------------------------
+// --- Menu de cenários, obstáculos e posição inicial ---------------------------
 const scenarioPanel = document.getElementById('scenario-panel');
 const scenarioTitle = document.createElement('div');
 scenarioTitle.className = 'panel-title';
@@ -88,16 +88,109 @@ SCENARIOS.forEach((s, i) => {
   scenarioButtons.set(s.id, btn);
 });
 
-function selectScenario(id) {
-  const scenario = SCENARIOS.find((s) => s.id === id);
+// Seleção de obstáculos, memorizada por cenário (inicia com o padrão de cada um)
+const obstacleSelections = new Map(
+  SCENARIOS.map((s) => [s.id, new Set(s.defaultObstacles || [])])
+);
+let currentScenarioId = SCENARIOS[0].id;
+
+const obstacleTitle = document.createElement('div');
+obstacleTitle.className = 'panel-subtitle';
+obstacleTitle.textContent = 'Obstáculos do cenário';
+scenarioPanel.appendChild(obstacleTitle);
+
+const obstacleChecks = new Map();
+OBSTACLE_TYPES.forEach((type) => {
+  const row = document.createElement('label');
+  row.className = 'obstacle-check';
+  const input = document.createElement('input');
+  input.type = 'checkbox';
+  input.addEventListener('change', () => {
+    const selection = obstacleSelections.get(currentScenarioId);
+    if (input.checked) selection.add(type.id);
+    else selection.delete(type.id);
+    rebuildScenario();
+  });
+  const text = document.createElement('span');
+  text.textContent = type.label;
+  row.appendChild(input);
+  row.appendChild(text);
+  scenarioPanel.appendChild(row);
+  obstacleChecks.set(type.id, input);
+});
+
+// Controles de posição inicial do participante
+const startPos = { ...START_DEFAULT };
+
+const startTitle = document.createElement('div');
+startTitle.className = 'panel-subtitle';
+startTitle.textContent = 'Posição inicial do participante';
+scenarioPanel.appendChild(startTitle);
+
+function makeStartSlider(labelText, axis, [min, max]) {
+  const row = document.createElement('div');
+  row.className = 'start-slider';
+  const label = document.createElement('span');
+  const input = document.createElement('input');
+  input.type = 'range';
+  input.min = String(min);
+  input.max = String(max);
+  input.step = '0.1';
+  input.value = String(startPos[axis]);
+  const updateLabel = () => {
+    label.textContent = `${labelText}: ${Number(startPos[axis]).toFixed(1)} m`;
+  };
+  input.addEventListener('input', () => {
+    startPos[axis] = Number(input.value);
+    updateLabel();
+    rebuildScenario();
+  });
+  updateLabel();
+  row.appendChild(label);
+  row.appendChild(input);
+  scenarioPanel.appendChild(row);
+}
+
+makeStartSlider('Lateral', 'x', START_LIMITS.x);
+makeStartSlider('Distância', 'z', START_LIMITS.z);
+
+// Sincroniza os checkboxes com a seleção do cenário ativo; cenários sem
+// slots de obstáculo (caminhada livre) têm o seletor desabilitado.
+function syncObstacleChecks(scenario) {
+  const selection = obstacleSelections.get(scenario.id);
+  const enabled = Boolean(scenario.obstacleSlots);
+  obstacleChecks.forEach((input, typeId) => {
+    input.checked = selection.has(typeId);
+    input.disabled = !enabled;
+    input.parentElement.classList.toggle('disabled', !enabled);
+  });
+}
+
+// Reconstrói o cenário ativo com as opções atuais (obstáculos + posição inicial).
+function rebuildScenario() {
+  const scenario = SCENARIOS.find((s) => s.id === currentScenarioId);
   if (!scenario) return;
-  const { curve, riskZone } = scenarioManager.load(scenario);
+  const selection = obstacleSelections.get(scenario.id);
+  // A ordem de OBSTACLE_TYPES define a prioridade de preenchimento dos slots.
+  const types = OBSTACLE_TYPES.filter((t) => selection.has(t.id)).map((t) => t.id);
+  const { curve, riskZone } = scenarioManager.load(scenario, {
+    types,
+    start: startPos,
+  });
   animationApi.setScenario({
     curve,
     riskZone,
     speed: scenario.speed,
     stop: scenario.stop,
   });
+}
+
+function selectScenario(id) {
+  const scenario = SCENARIOS.find((s) => s.id === id);
+  if (!scenario) return;
+  currentScenarioId = id;
+  syncObstacleChecks(scenario);
+  rebuildScenario();
   scenarioButtons.forEach((btn, key) => btn.classList.toggle('active', key === id));
 }
 

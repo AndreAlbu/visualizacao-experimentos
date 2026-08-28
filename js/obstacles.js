@@ -58,9 +58,111 @@ function studyDesk() {
   return group;
 }
 
+// Duas pessoas lado a lado, conversando.
+function personPair() {
+  const group = new THREE.Group();
+  const a = standingPerson();
+  a.position.set(-0.45, 0, 0.05);
+  a.rotation.y = 0.5;
+  const b = standingPerson();
+  b.position.set(0.45, 0, -0.05);
+  b.rotation.y = -0.6;
+  group.add(a, b);
+  return group;
+}
+
+// Caixa de papelão no chão.
+function cardboardBox() {
+  const box = new THREE.Mesh(
+    new THREE.BoxGeometry(0.55, 0.5, 0.55),
+    new THREE.MeshStandardMaterial({ color: COLORS.obstacleWood, roughness: 0.85 })
+  );
+  box.position.y = 0.25;
+  box.rotation.y = 0.25;
+  box.castShadow = true;
+  box.receiveShadow = true;
+  const group = new THREE.Group();
+  group.add(box);
+  return group;
+}
+
+// Cadeira simples de madeira.
+function chair() {
+  const group = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({ color: COLORS.obstacleWood, roughness: 0.8 });
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.05, 0.42), mat);
+  seat.position.y = 0.45;
+  const back = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.45, 0.05), mat);
+  back.position.set(0, 0.7, -0.2);
+  group.add(seat, back);
+  const legGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.45, 6);
+  [[0.18, -0.18], [-0.18, -0.18], [0.18, 0.18], [-0.18, 0.18]].forEach(([x, z]) => {
+    const leg = new THREE.Mesh(legGeo, mat);
+    leg.position.set(x, 0.225, z);
+    group.add(leg);
+  });
+  group.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  return group;
+}
+
+// Carrinho (estrutura em barras finas + rodas), tipo carrinho de transporte.
+function cart() {
+  const group = new THREE.Group();
+  const barMat = new THREE.MeshStandardMaterial({ color: COLORS.obstacleMetal, roughness: 0.4, metalness: 0.6 });
+
+  const w = 0.55, h = 0.5, d = 0.8, y0 = 0.55;
+  const edges = [
+    [[-w / 2, y0, -d / 2], [-w / 2, y0 + h, -d / 2]],
+    [[w / 2, y0, -d / 2], [w / 2, y0 + h, -d / 2]],
+    [[-w / 2, y0, d / 2], [-w / 2, y0 + h, d / 2]],
+    [[w / 2, y0, d / 2], [w / 2, y0 + h, d / 2]],
+    [[-w / 2, y0 + h, -d / 2], [w / 2, y0 + h, -d / 2]],
+    [[w / 2, y0 + h, -d / 2], [w / 2, y0 + h, d / 2]],
+    [[w / 2, y0 + h, d / 2], [-w / 2, y0 + h, d / 2]],
+    [[-w / 2, y0 + h, d / 2], [-w / 2, y0 + h, -d / 2]],
+    [[-w / 2, y0, -d / 2], [w / 2, y0, -d / 2]],
+    [[w / 2, y0, -d / 2], [w / 2, y0, d / 2]],
+    [[w / 2, y0, d / 2], [-w / 2, y0, d / 2]],
+    [[-w / 2, y0, d / 2], [-w / 2, y0, -d / 2]],
+  ];
+  const points = [];
+  edges.forEach(([a, b]) => points.push(new THREE.Vector3(...a), new THREE.Vector3(...b)));
+  const basket = new THREE.LineSegments(
+    new THREE.BufferGeometry().setFromPoints(points),
+    new THREE.LineBasicMaterial({ color: COLORS.obstacleMetal })
+  );
+  group.add(basket);
+
+  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, w, 8), barMat);
+  handle.rotation.z = Math.PI / 2;
+  handle.position.set(0, y0 + h + 0.15, d / 2 + 0.1);
+  group.add(handle);
+  [-w / 2, w / 2].forEach((x) => {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.2, 8), barMat);
+    post.position.set(x, y0 + h + 0.05, d / 2 + 0.1);
+    group.add(post);
+  });
+
+  const wheelGeo = new THREE.CylinderGeometry(0.07, 0.07, 0.03, 12);
+  [[-w / 2, -d / 2], [w / 2, -d / 2], [-w / 2, d / 2], [w / 2, d / 2]].forEach(([x, z]) => {
+    const wheel = new THREE.Mesh(wheelGeo, new THREE.MeshStandardMaterial({ color: 0x2b2f33 }));
+    wheel.rotation.x = Math.PI / 2;
+    wheel.position.set(x, 0.07, z);
+    wheel.castShadow = true;
+    group.add(wheel);
+  });
+  group.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  return group;
+}
+
+// Mapeia o id do tipo (ver OBSTACLE_TYPES em config.js) para o construtor.
 const OBSTACLE_BUILDERS = {
-  person: standingPerson,
-  desk: studyDesk,
+  mesa: studyDesk,
+  'duas-pessoas': personPair,
+  pessoa: standingPerson,
+  caixa: cardboardBox,
+  cadeira: chair,
+  carrinho: cart,
 };
 
 // Constrói os obstáculos de um cenário dentro do grupo dado.
