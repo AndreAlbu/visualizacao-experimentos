@@ -85,8 +85,9 @@ export const OBSTACLE_TYPES = [
 
 // Limites do controle de posição inicial do participante (metros).
 // O X desloca a faixa inteira do experimento (trajetória + obstáculos);
-// limitado a ±1 m para o desvio (±1,5 m) não invadir as estantes.
-export const START_LIMITS = { x: [-1, 1], z: [0.5, 5.5] };
+// limitado a ±0,7 m para o pico do desvio (±1,5 m + curvatura do spline)
+// não encostar nas estantes.
+export const START_LIMITS = { x: [-0.7, 0.7], z: [0.5, 5.5] };
 export const START_DEFAULT = { x: 0, z: 2 };
 
 export const SCENARIOS = [
@@ -96,15 +97,17 @@ export const SCENARIOS = [
     speed: WALK_SPEED,
     path: [
       [0, 0, 2], [0, 0, 8], [0, 0, 12],
-      [1.5, 0, 14.2], [1.5, 0, 15.8],
+      [1.5, 0, 13.4], [1.5, 0, 16.6],
       [0, 0, 18], [0, 0, 23],
     ],
     ghost: [[0, 0, 12], [0, 0, 19.5]], // curso original que atravessaria a mesa
     detourZ: [12.3, 17.7], // faixa da trajetória destacada como desvio
     risk: { center: [0, 0, 15], radius: 1.8 },
     // Slots (offsets x/z relativos ao centro da zona de risco) preenchidos
-    // pelos tipos de obstáculo selecionados no painel.
-    obstacleSlots: [[0, 0], [0.7, -0.7], [-0.7, 0.7], [0.5, 0.9], [-0.5, -0.9]],
+    // pelos tipos de obstáculo selecionados no painel. Nos cenários de desvio
+    // os obstáculos se enfileiram AO LONGO do corredor (coluna em z), mantendo
+    // a lateral livre para o participante passar com folga constante.
+    obstacleSlots: [[0, 0], [0, 0.8], [0, -0.8], [0, 1.4], [0, -1.4]],
     defaultObstacles: ['mesa'],
     markers: [
       { id: 'START', pos: [0, 0, 2] },
@@ -119,13 +122,13 @@ export const SCENARIOS = [
     speed: WALK_SPEED,
     path: [
       [0, 0, 2], [0, 0, 8], [0, 0, 12],
-      [-1.5, 0, 14.2], [-1.5, 0, 15.8],
+      [-1.5, 0, 13.4], [-1.5, 0, 16.6],
       [0, 0, 18], [0, 0, 23],
     ],
     ghost: [[0, 0, 12], [0, 0, 19.5]],
     detourZ: [12.3, 17.7],
     risk: { center: [0, 0, 15], radius: 1.8 },
-    obstacleSlots: [[0, 0], [0.7, -0.7], [-0.7, 0.7], [0.5, 0.9], [-0.5, -0.9]],
+    obstacleSlots: [[0, 0], [0, 0.8], [0, -0.8], [0, 1.4], [0, -1.4]],
     defaultObstacles: ['duas-pessoas'],
     markers: [
       { id: 'START', pos: [0, 0, 2] },
