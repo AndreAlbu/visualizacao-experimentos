@@ -197,6 +197,16 @@ function selectScenario(id) {
 // Cenário inicial
 selectScenario(SCENARIOS[0].id);
 
+// --- Liga/desliga os rótulos 3D da cena ---------------------------------------
+// Todos os rótulos (marcadores, obstáculos, trajetórias...) vivem na camada
+// CSS2D; alternar a visibilidade dela liga/desliga tudo de uma vez.
+const labelsBtn = document.getElementById('btn-labels');
+labelsBtn.addEventListener('click', () => {
+  const visible = labelRenderer.domElement.style.display !== 'none';
+  labelRenderer.domElement.style.display = visible ? 'none' : '';
+  labelsBtn.classList.toggle('active', !visible);
+});
+
 // Handle de depuração (console): permite inspecionar câmera/participante e
 // avançar quadros manualmente com __debugScene.step(dt).
 window.__debugScene = {

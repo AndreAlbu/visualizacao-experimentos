@@ -191,6 +191,7 @@ html, body {
   color: #fff;
   border-color: var(--accent-blue);
 }
+.view-btn--toggle { margin-left: 10px; }
 
 /* ---------- Controles de animação ---------- */
 .animation-controls {
