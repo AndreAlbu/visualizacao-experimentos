@@ -220,6 +220,14 @@ labelsBtn.addEventListener('click', () => {
   labelsBtn.classList.toggle('active', !visible);
 });
 
+// --- Liga/desliga o cone de campo de visão da câmera ---------------------------
+const fovBtn = document.getElementById('btn-fov');
+const fovCone = participant.group.getObjectByName('fov-cone');
+fovBtn.addEventListener('click', () => {
+  fovCone.visible = !fovCone.visible;
+  fovBtn.classList.toggle('active', fovCone.visible);
+});
+
 // Handle de depuração (console): permite inspecionar câmera/participante e
 // avançar quadros manualmente com __debugScene.step(dt).
 window.__debugScene = {
