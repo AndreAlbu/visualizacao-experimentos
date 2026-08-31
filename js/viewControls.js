@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import { CAMERA_OFFSET } from './participant.js';
+
+const Y_AXIS = new THREE.Vector3(0, 1, 0);
 
 // Presets de câmera. `target` é o ponto observado; `pos` é a posição da câmera.
 // `egocentric` é uma função: é recalculada a cada quadro para que a câmera
@@ -11,7 +14,7 @@ function presets(participantGroup, egoLook) {
       pos: new THREE.Vector3(0.2, 32, 12.5),
       target: new THREE.Vector3(0.2, 0, 12.5),
     },
-    // Câmera presa à frente do operador, na altura do dispositivo. A direção
+    // Câmera posicionada exatamente onde o celular do gimbal grava. A direção
     // do olhar parte da orientação da caminhada e soma os offsets de yaw/pitch
     // controlados pelo arraste do mouse (permite girar 360° e olhar os
     // obstáculos de lado sem sair do ponto de vista do participante).
@@ -22,7 +25,9 @@ function presets(participantGroup, egoLook) {
       const yaw = baseYaw + egoLook.yaw;
       const cosP = Math.cos(egoLook.pitch);
       const dir = new THREE.Vector3(Math.sin(yaw) * cosP, Math.sin(egoLook.pitch), Math.cos(yaw) * cosP);
-      const pos = new THREE.Vector3(p.x + facing.x * 0.55, 1.55, p.z + facing.z * 0.55);
+      // Offset do dispositivo (mão/gimbal) girado para a orientação do corpo
+      const offset = CAMERA_OFFSET.clone().applyAxisAngle(Y_AXIS, baseYaw);
+      const pos = new THREE.Vector3(p.x + offset.x, offset.y, p.z + offset.z);
       return {
         pos,
         target: pos.clone().addScaledVector(dir, 6.5),

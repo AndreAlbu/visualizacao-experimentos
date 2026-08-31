@@ -60,19 +60,19 @@ export function setupAnimationController({ participant, ui }) {
     ui.timeLabel.textContent = `${(progress * 100).toFixed(0)}%`;
   }
 
+  // Apenas o braço livre balança: o braço que segura o gimbal permanece
+  // firme, mantendo o enquadramento estável durante a gravação.
   function walkingPose() {
     participant.legL.rotation.x = 0.3;
     participant.legR.rotation.x = -0.3;
-    participant.armL.rotation.x = -0.3;
-    participant.armR.rotation.x = 0.3;
+    participant.armFree.rotation.x = -0.3;
   }
 
   // Postura neutra, usada quando o participante para diante do bloqueio.
   function standingPose() {
     participant.legL.rotation.x = 0;
     participant.legR.rotation.x = 0;
-    participant.armL.rotation.x = 0;
-    participant.armR.rotation.x = 0;
+    participant.armFree.rotation.x = 0;
   }
 
   function update(delta) {
@@ -90,8 +90,7 @@ export function setupAnimationController({ participant, ui }) {
     const swing = Math.sin(walkClock) * 0.5;
     participant.legL.rotation.x = swing;
     participant.legR.rotation.x = -swing;
-    participant.armL.rotation.x = -swing;
-    participant.armR.rotation.x = swing;
+    participant.armFree.rotation.x = -swing;
 
     if (progress >= 1) {
       playing = false;
