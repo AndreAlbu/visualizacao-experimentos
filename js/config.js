@@ -95,13 +95,15 @@ export const SCENARIOS = [
     id: 'desvio-esquerda',
     label: 'Desvio à esquerda',
     speed: WALK_SPEED,
+    // Como no protocolo real: caminha reto, desvia do obstáculo e SEGUE RETO
+    // na nova faixa (não retorna ao centro).
     path: [
       [0, 0, 2], [0, 0, 8], [0, 0, 12],
       [1.5, 0, 13.4], [1.5, 0, 16.6],
-      [0, 0, 18], [0, 0, 23],
+      [1.5, 0, 18], [1.5, 0, 23],
     ],
     ghost: [[0, 0, 12], [0, 0, 19.5]], // curso original que atravessaria a mesa
-    detourZ: [12.3, 17.7], // faixa da trajetória destacada como desvio
+    detourZ: [12.3, 16.8], // faixa da trajetória destacada como desvio
     risk: { center: [0, 0, 15], radius: 1.8 },
     // Slots (offsets x/z relativos ao centro da zona de risco) preenchidos
     // pelos tipos de obstáculo selecionados no painel. Nos cenários de desvio
@@ -112,8 +114,8 @@ export const SCENARIOS = [
     markers: [
       { id: 'START', pos: [0, 0, 2] },
       { id: 'T1', pos: [0, 0, 12] },
-      { id: 'T2', pos: [0, 0, 18] },
-      { id: 'END', pos: [0, 0, 23] },
+      { id: 'T2', pos: [1.5, 0, 18] },
+      { id: 'END', pos: [1.5, 0, 23] },
     ],
   },
   {
@@ -123,18 +125,18 @@ export const SCENARIOS = [
     path: [
       [0, 0, 2], [0, 0, 8], [0, 0, 12],
       [-1.5, 0, 13.4], [-1.5, 0, 16.6],
-      [0, 0, 18], [0, 0, 23],
+      [-1.5, 0, 18], [-1.5, 0, 23],
     ],
     ghost: [[0, 0, 12], [0, 0, 19.5]],
-    detourZ: [12.3, 17.7],
+    detourZ: [12.3, 16.8],
     risk: { center: [0, 0, 15], radius: 1.8 },
     obstacleSlots: [[0, 0], [0, 0.8], [0, -0.8], [0, 1.4], [0, -1.4]],
     defaultObstacles: ['duas-pessoas'],
     markers: [
       { id: 'START', pos: [0, 0, 2] },
       { id: 'T1', pos: [0, 0, 12] },
-      { id: 'T2', pos: [0, 0, 18] },
-      { id: 'END', pos: [0, 0, 23] },
+      { id: 'T2', pos: [-1.5, 0, 18] },
+      { id: 'END', pos: [-1.5, 0, 23] },
     ],
   },
   {
