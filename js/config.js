@@ -142,6 +142,7 @@ export const SCENARIOS = [
   {
     id: 'desvio-esquerda',
     label: 'Desvio à esquerda',
+    requireObstacle: true, // não faz sentido desviar de nada: sempre ao menos 1 obstáculo
     speed: WALK_SPEED,
     // Como no protocolo real: caminha reto, desvia do obstáculo e SEGUE RETO
     // na nova faixa (não retorna ao centro).
@@ -171,6 +172,7 @@ export const SCENARIOS = [
   {
     id: 'desvio-direita',
     label: 'Desvio à direita',
+    requireObstacle: true, // não faz sentido desviar de nada: sempre ao menos 1 obstáculo
     speed: WALK_SPEED,
     path: [
       [0, 0, 2], [0, 0, 8], [0, 0, 12],
