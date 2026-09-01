@@ -6,57 +6,58 @@ import {
   DOORS_RIGHT_Z,
   CEILING_LIGHTS_Z,
 } from './config.js';
+import { buildDecor } from './obstacles.js';
 
-// Ambiente inspirado na estrutura do vídeo de referência do experimento:
-// corredor de biblioteca entre estantes (laranja de um lado, branca do outro),
-// piso escuro, laje de concreto aparente e, ao final, uma parede-janela com
-// mainéis coloridos dando para uma área externa arborizada.
+// ---------------------------------------------------------------------------
+// Ambientes do experimento. Todos compartilham a mesma largura útil de
+// caminhada (DIM.corridorWidth) e o mesmo comprimento, de modo que os
+// cenários, trajetórias e obstáculos funcionam igualmente em qualquer um:
+//
+//   biblioteca -> corredor entre estantes (vídeo de referência)
+//   corredor   -> corredor institucional de paredes lisas (escola/prédio)
+//   calcada    -> ambiente externo, calçada com fachada e rua
+// ---------------------------------------------------------------------------
 
-function createFloorTexture() {
+function hex(n) {
+  return '#' + n.toString(16).padStart(6, '0');
+}
+
+// Textura procedural de grade (piso em placas, calçada em lajotas...).
+function createGridTexture(baseColor, lineColor, tiles, repeatX, repeatY, lineWidth = 2) {
   const size = 512;
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = size;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#' + COLORS.floor.toString(16).padStart(6, '0');
+  ctx.fillStyle = hex(baseColor);
   ctx.fillRect(0, 0, size, size);
-  ctx.strokeStyle = '#' + COLORS.floorGrid.toString(16).padStart(6, '0');
-  ctx.lineWidth = 2;
-  const tiles = 8;
+  ctx.strokeStyle = hex(lineColor);
+  ctx.lineWidth = lineWidth;
   const step = size / tiles;
   for (let i = 0; i <= tiles; i++) {
-    ctx.beginPath();
-    ctx.moveTo(i * step, 0);
-    ctx.lineTo(i * step, size);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(0, i * step);
-    ctx.lineTo(size, i * step);
-    ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(i * step, 0); ctx.lineTo(i * step, size); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, i * step); ctx.lineTo(size, i * step); ctx.stroke();
   }
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(DIM.corridorWidth / 2, DIM.corridorLength / 2);
+  tex.repeat.set(repeatX, repeatY);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
 }
 
-// Textura sutil de laje/deck metálico corrugado para o teto.
-function createCeilingTexture() {
+// Textura sutil de laje/deck metálico corrugado para o teto da biblioteca.
+function createRibbedTexture() {
   const size = 256;
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = size;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#' + COLORS.ceiling.toString(16).padStart(6, '0');
+  ctx.fillStyle = hex(COLORS.ceiling);
   ctx.fillRect(0, 0, size, size);
-  ctx.strokeStyle = '#' + COLORS.ceilingRib.toString(16).padStart(6, '0');
+  ctx.strokeStyle = hex(COLORS.ceilingRib);
   ctx.lineWidth = 3;
   const ribs = 14;
   for (let i = 0; i < ribs; i++) {
     const x = (i / ribs) * size;
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, size);
-    ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, size); ctx.stroke();
   }
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
@@ -65,33 +66,34 @@ function createCeilingTexture() {
   return tex;
 }
 
-function addDoor(scene, x, z, facing) {
-  const group = new THREE.Group();
+// Porta de passagem embutida na parede/estante.
+function addDoor(group, x, z, facing, height = DIM.shelfHeight) {
+  const doorGroup = new THREE.Group();
   const frameMat = new THREE.MeshStandardMaterial({ color: COLORS.doorFrame, roughness: 0.8 });
   const panelMat = new THREE.MeshStandardMaterial({ color: COLORS.doorPanel, roughness: 0.6 });
 
-  const frame = new THREE.Mesh(new THREE.BoxGeometry(0.08, DIM.shelfHeight + 0.15, 1.3), frameMat);
-  frame.position.set(x, (DIM.shelfHeight + 0.15) / 2, z);
-  group.add(frame);
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(0.08, height + 0.15, 1.3), frameMat);
+  frame.position.set(x, (height + 0.15) / 2, z);
+  doorGroup.add(frame);
 
-  const panel = new THREE.Mesh(new THREE.BoxGeometry(0.05, DIM.shelfHeight - 0.05, 1.1), panelMat);
-  panel.position.set(x + facing * 0.05, (DIM.shelfHeight - 0.05) / 2, z);
-  group.add(panel);
+  const panel = new THREE.Mesh(new THREE.BoxGeometry(0.05, height - 0.05, 1.1), panelMat);
+  panel.position.set(x + facing * 0.05, (height - 0.05) / 2, z);
+  doorGroup.add(panel);
 
   const handle = new THREE.Mesh(
     new THREE.SphereGeometry(0.04, 8, 8),
     new THREE.MeshStandardMaterial({ color: COLORS.obstacleMetal })
   );
-  handle.position.set(x + facing * 0.08, 1.1, z + 0.45);
-  group.add(handle);
+  handle.position.set(x + facing * 0.08, 1.05, z + 0.45);
+  doorGroup.add(handle);
 
-  scene.add(group);
+  group.add(doorGroup);
 }
 
-// Tubo fluorescente fino embutido na laje, como no vídeo de referência.
-function addCeilingLight(scene, z) {
+// Luminária de teto em tubo + luz pontual.
+function addCeilingLight(group, z, { width = DIM.corridorWidth * 0.7, y = DIM.corridorHeight - 0.08, castShadow = false } = {}) {
   const fixture = new THREE.Mesh(
-    new THREE.BoxGeometry(DIM.corridorWidth * 0.7, 0.06, 0.16),
+    new THREE.BoxGeometry(width, 0.06, 0.16),
     new THREE.MeshStandardMaterial({
       color: COLORS.fixture,
       emissive: COLORS.fixture,
@@ -99,19 +101,31 @@ function addCeilingLight(scene, z) {
       roughness: 0.4,
     })
   );
-  fixture.position.set(0, DIM.corridorHeight - 0.08, z);
-  scene.add(fixture);
+  fixture.position.set(0, y, z);
+  group.add(fixture);
 
   const light = new THREE.PointLight(0xfff6df, 6, 9, 2);
-  light.position.set(0, DIM.corridorHeight - 0.3, z);
-  light.castShadow = z === CEILING_LIGHTS_Z[Math.floor(CEILING_LIGHTS_Z.length / 2)];
-  if (light.castShadow) {
+  light.position.set(0, y - 0.22, z);
+  light.castShadow = castShadow;
+  if (castShadow) {
     light.shadow.mapSize.set(1024, 1024);
     light.shadow.camera.near = 0.5;
     light.shadow.camera.far = 15;
   }
-  scene.add(light);
+  group.add(light);
 }
+
+// Iluminação interna comum aos ambientes fechados.
+function addIndoorLighting(group) {
+  const shadowZ = CEILING_LIGHTS_Z[Math.floor(CEILING_LIGHTS_Z.length / 2)];
+  CEILING_LIGHTS_Z.forEach((z) => addCeilingLight(group, z, { castShadow: z === shadowZ }));
+  group.add(new THREE.AmbientLight(0xffffff, 0.5));
+  group.add(new THREE.HemisphereLight(0xeef0ec, 0x2a2e33, 0.4));
+}
+
+// ---------------------------------------------------------------------------
+// Ambiente 1: biblioteca (corredor entre estantes)
+// ---------------------------------------------------------------------------
 
 // Calcula os trechos contínuos (sem porta) ao longo do corredor para um lado.
 function computeSegments(length, doorZs, gapHalfWidth = 0.8, margin = 0.4) {
@@ -126,14 +140,13 @@ function computeSegments(length, doorZs, gapHalfWidth = 0.8, margin = 0.4) {
   return segments;
 }
 
-// Constrói a estante de um lado do corredor: prateleiras + montantes + livros.
-function buildShelfSide(scene, side, doorZs) {
+// Estante de um lado do corredor: prateleiras + montantes + livros.
+function buildShelfSide(group, side, doorZs) {
   const isOrange = side === -1;
   const frameColor = isOrange ? COLORS.shelfOrangeFrame : COLORS.shelfWhiteFrame;
   const boardColor = isOrange ? COLORS.shelfOrangeBoard : COLORS.shelfWhiteBoard;
   const halfW = DIM.corridorWidth / 2;
   const shelfDepth = 0.34;
-  const faceX = side * (halfW - 0.03);
   const centerX = side * (halfW - 0.03 - shelfDepth / 2);
   const levels = [0.05, 0.62, 1.19, 1.76, DIM.shelfHeight];
 
@@ -145,33 +158,29 @@ function buildShelfSide(scene, side, doorZs) {
   const bookMaterials = COLORS.bookColors.map(
     (c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.8 })
   );
-  const bookInstances = []; // { level, transforms: [] }
+  const bookInstances = [];
 
   segments.forEach(([z0, z1]) => {
     const segLen = z1 - z0;
     const segCenterZ = (z0 + z1) / 2;
 
-    // Prateleiras (tábuas horizontais)
     levels.forEach((y) => {
       const board = new THREE.Mesh(new THREE.BoxGeometry(shelfDepth, 0.04, segLen), boardMat);
       board.position.set(centerX, y, segCenterZ);
       board.castShadow = true;
       board.receiveShadow = true;
-      scene.add(board);
+      group.add(board);
     });
 
-    // Montantes verticais (a cada ~2.1m dentro do trecho, incluindo as extremidades)
-    const postStep = 2.1;
-    const postCount = Math.max(2, Math.round(segLen / postStep) + 1);
+    const postCount = Math.max(2, Math.round(segLen / 2.1) + 1);
     for (let i = 0; i < postCount; i++) {
       const z = z0 + (segLen * i) / (postCount - 1);
       const post = new THREE.Mesh(new THREE.BoxGeometry(shelfDepth, DIM.shelfHeight, 0.05), frameMat);
       post.position.set(centerX, DIM.shelfHeight / 2, z);
       post.castShadow = true;
-      scene.add(post);
+      group.add(post);
     }
 
-    // Livros (posições para InstancedMesh, nos 3 níveis intermediários)
     [1, 2, 3].forEach((li) => {
       const y = levels[li] + 0.09;
       const bookCount = Math.round(segLen / 0.16);
@@ -190,14 +199,13 @@ function buildShelfSide(scene, side, doorZs) {
     });
   });
 
-  // Painel frontal (topo da estante) fechando o vão acima do último nível
   bookMaterials.forEach((mat, matIndex) => {
-    const group = bookInstances.filter((b) => b.mat === matIndex);
-    if (!group.length) return;
-    const mesh = new THREE.InstancedMesh(bookGeo, mat, group.length);
+    const items = bookInstances.filter((b) => b.mat === matIndex);
+    if (!items.length) return;
+    const mesh = new THREE.InstancedMesh(bookGeo, mat, items.length);
     mesh.castShadow = true;
     const dummy = new THREE.Object3D();
-    group.forEach((b, i) => {
+    items.forEach((b, i) => {
       dummy.position.set(b.x, b.y, b.z);
       dummy.rotation.set(0, b.rotY, 0);
       dummy.scale.set(1, b.scaleY, 1);
@@ -205,14 +213,12 @@ function buildShelfSide(scene, side, doorZs) {
       mesh.setMatrixAt(i, dummy.matrix);
     });
     mesh.instanceMatrix.needsUpdate = true;
-    scene.add(mesh);
+    group.add(mesh);
   });
-
-  return { faceX };
 }
 
-// Parede-janela ao final do corredor: mainéis coloridos + vidro + área externa.
-function buildWindowWall(scene) {
+// Parede-janela ao final do corredor da biblioteca.
+function buildWindowWall(group) {
   const z = DIM.corridorLength + 0.05;
   const spanHalf = DIM.corridorWidth / 2 + 1.1;
   const colors = [COLORS.mullionWhite, COLORS.mullionPink, COLORS.mullionOrange, COLORS.mullionWhite, COLORS.mullionPink];
@@ -220,45 +226,40 @@ function buildWindowWall(scene) {
   const paneWidth = (spanHalf * 2) / panes;
 
   const glassMat = new THREE.MeshStandardMaterial({
-    color: COLORS.glass,
-    transparent: true,
-    opacity: 0.35,
-    roughness: 0.1,
-    metalness: 0.1,
-    side: THREE.DoubleSide,
+    color: COLORS.glass, transparent: true, opacity: 0.35,
+    roughness: 0.1, metalness: 0.1, side: THREE.DoubleSide,
   });
 
   for (let i = 0; i < panes; i++) {
     const x = -spanHalf + paneWidth * (i + 0.5);
-    const pillarMat = new THREE.MeshStandardMaterial({ color: colors[i], roughness: 0.7 });
-    const pillar = new THREE.Mesh(new THREE.BoxGeometry(paneWidth - 0.08, DIM.corridorHeight, 0.12), pillarMat);
+    const pillar = new THREE.Mesh(
+      new THREE.BoxGeometry(paneWidth - 0.08, DIM.corridorHeight, 0.12),
+      new THREE.MeshStandardMaterial({ color: colors[i], roughness: 0.7 })
+    );
     pillar.position.set(x, DIM.corridorHeight / 2, z);
     pillar.castShadow = true;
-    scene.add(pillar);
+    group.add(pillar);
 
     const glass = new THREE.Mesh(new THREE.PlaneGeometry(paneWidth - 0.2, DIM.corridorHeight - 0.3), glassMat);
     glass.position.set(x, DIM.corridorHeight / 2, z + 0.07);
-    scene.add(glass);
+    group.add(glass);
   }
-  // Montantes verticais finos entre os vidros
   for (let i = 0; i <= panes; i++) {
-    const x = -spanHalf + paneWidth * i;
     const post = new THREE.Mesh(
       new THREE.BoxGeometry(0.06, DIM.corridorHeight, 0.1),
       new THREE.MeshStandardMaterial({ color: COLORS.mullionWhite, roughness: 0.6 })
     );
-    post.position.set(x, DIM.corridorHeight / 2, z);
-    scene.add(post);
+    post.position.set(-spanHalf + paneWidth * i, DIM.corridorHeight / 2, z);
+    group.add(post);
   }
 
-  // Área externa simplificada: vegetação e alguns carros ao longe
-  const groundOutside = new THREE.Mesh(
+  const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(spanHalf * 2 + 6, 14),
     new THREE.MeshStandardMaterial({ color: COLORS.skyOutside, roughness: 1 })
   );
-  groundOutside.rotation.x = -Math.PI / 2;
-  groundOutside.position.set(0, 0.02, z + 7);
-  scene.add(groundOutside);
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.set(0, 0.02, z + 7);
+  group.add(ground);
 
   const trunkMat = new THREE.MeshStandardMaterial({ color: COLORS.trunk, roughness: 0.9 });
   const foliageMat = new THREE.MeshStandardMaterial({ color: COLORS.foliage, roughness: 0.85 });
@@ -267,66 +268,379 @@ function buildWindowWall(scene) {
     trunk.position.set(x, 0.7, z + 4 + (i % 2) * 1.5);
     const foliage = new THREE.Mesh(new THREE.SphereGeometry(0.9 + Math.random() * 0.3, 8, 8), foliageMat);
     foliage.position.set(trunk.position.x, 2.0, trunk.position.z);
-    scene.add(trunk, foliage);
+    group.add(trunk, foliage);
   });
 
-  const carColors = [0xb7c4cc, 0x8a3b3b, 0x3b4a5c];
-  carColors.forEach((c, i) => {
+  [0xb7c4cc, 0x8a3b3b, 0x3b4a5c].forEach((c, i) => {
     const car = new THREE.Mesh(
       new THREE.BoxGeometry(1.4, 0.5, 0.7),
       new THREE.MeshStandardMaterial({ color: c, roughness: 0.5, metalness: 0.3 })
     );
     car.position.set(-3 + i * 2.4, 0.28, z + 10);
-    scene.add(car);
+    group.add(car);
   });
 }
 
-// Constrói o ambiente: piso, estantes laterais, teto, portas, iluminação e a
-// parede-janela ao final. Retorna referências úteis para o restante da cena
-// (ex.: o teto, escondido na visão superior para não obstruir a leitura).
-export function buildEnvironment(scene) {
-  // Piso
+function buildLibrary(group, scene) {
+  scene.background = new THREE.Color(COLORS.wall);
+  scene.fog = new THREE.Fog(COLORS.wall, 22, 58);
+
   const floor = new THREE.Mesh(
     new THREE.PlaneGeometry(DIM.corridorWidth, DIM.corridorLength),
-    new THREE.MeshStandardMaterial({ map: createFloorTexture(), roughness: 0.85 })
+    new THREE.MeshStandardMaterial({
+      map: createGridTexture(COLORS.floor, COLORS.floorGrid, 8, DIM.corridorWidth / 2, DIM.corridorLength / 2),
+      roughness: 0.85,
+    })
   );
   floor.rotation.x = -Math.PI / 2;
   floor.position.set(0, 0, DIM.corridorLength / 2);
   floor.receiveShadow = true;
-  scene.add(floor);
+  group.add(floor);
 
-  // Estantes laterais (substituem as paredes lisas): laranja à esquerda, branca à direita
-  buildShelfSide(scene, -1, DOORS_LEFT_Z);
-  buildShelfSide(scene, 1, DOORS_RIGHT_Z);
+  buildShelfSide(group, -1, DOORS_LEFT_Z);
+  buildShelfSide(group, 1, DOORS_RIGHT_Z);
 
-  // Teto em laje de concreto aparente
   const ceiling = new THREE.Mesh(
     new THREE.PlaneGeometry(DIM.corridorWidth, DIM.corridorLength),
-    new THREE.MeshStandardMaterial({ map: createCeilingTexture(), roughness: 1 })
+    new THREE.MeshStandardMaterial({ map: createRibbedTexture(), roughness: 1 })
   );
   ceiling.rotation.x = Math.PI / 2;
   ceiling.position.set(0, DIM.corridorHeight, DIM.corridorLength / 2);
   ceiling.receiveShadow = true;
-  scene.add(ceiling);
+  group.add(ceiling);
 
-  // Portas (vãos de passagem na estante)
   const halfW = DIM.corridorWidth / 2;
-  DOORS_LEFT_Z.forEach((z) => addDoor(scene, -halfW + 0.02, z, 1));
-  DOORS_RIGHT_Z.forEach((z) => addDoor(scene, halfW - 0.02, z, -1));
+  DOORS_LEFT_Z.forEach((z) => addDoor(group, -halfW + 0.02, z, 1));
+  DOORS_RIGHT_Z.forEach((z) => addDoor(group, halfW - 0.02, z, -1));
 
-  // Iluminação de teto
-  CEILING_LIGHTS_Z.forEach((z) => addCeilingLight(scene, z));
-
-  // Parede-janela ao final do corredor
-  buildWindowWall(scene);
-
-  // Luz ambiente geral suave
-  scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-  const hemi = new THREE.HemisphereLight(0xeef0ec, 0x2a2e33, 0.4);
-  scene.add(hemi);
-
-  // Neblina sutil para reforçar profundidade do corredor
-  scene.fog = new THREE.Fog(COLORS.wall, 22, 58);
+  addIndoorLighting(group);
+  buildWindowWall(group);
+  buildDecor(group); // banquinho + recanto de leitura junto à janela
 
   return { ceiling };
+}
+
+// ---------------------------------------------------------------------------
+// Ambiente 2: corredor institucional (escola / prédio público)
+// Paredes lisas e IGUAIS dos dois lados — sem referências visuais laterais.
+// ---------------------------------------------------------------------------
+
+function buildCorridorWall(group, side) {
+  const halfW = DIM.corridorWidth / 2;
+  const x = side * halfW;
+  const wallMat = new THREE.MeshStandardMaterial({ color: COLORS.corridorWall, roughness: 0.95 });
+  const wainscotMat = new THREE.MeshStandardMaterial({ color: COLORS.corridorWainscot, roughness: 0.85 });
+  const baseMat = new THREE.MeshStandardMaterial({ color: COLORS.corridorBaseboard, roughness: 0.8 });
+
+  // Parede principal
+  const wall = new THREE.Mesh(
+    new THREE.PlaneGeometry(DIM.corridorLength, DIM.corridorHeight),
+    wallMat
+  );
+  wall.position.set(x, DIM.corridorHeight / 2, DIM.corridorLength / 2);
+  wall.rotation.y = side === -1 ? Math.PI / 2 : -Math.PI / 2;
+  wall.receiveShadow = true;
+  group.add(wall);
+
+  // Faixa pintada inferior (wainscot) — típica de escolas e prédios públicos
+  const wainscot = new THREE.Mesh(
+    new THREE.BoxGeometry(0.04, 1.1, DIM.corridorLength),
+    wainscotMat
+  );
+  wainscot.position.set(x - side * 0.02, 0.7, DIM.corridorLength / 2);
+  wainscot.receiveShadow = true;
+  group.add(wainscot);
+
+  // Rodapé
+  const base = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.14, DIM.corridorLength), baseMat);
+  base.position.set(x - side * 0.02, 0.07, DIM.corridorLength / 2);
+  group.add(base);
+}
+
+function buildCorridor(group, scene) {
+  scene.background = new THREE.Color(COLORS.corridorWall);
+  scene.fog = new THREE.Fog(COLORS.corridorWall, 24, 60);
+
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(DIM.corridorWidth, DIM.corridorLength),
+    new THREE.MeshStandardMaterial({
+      map: createGridTexture(COLORS.corridorFloor, COLORS.corridorFloorGrid, 6, DIM.corridorWidth / 1.5, DIM.corridorLength / 1.5),
+      roughness: 0.7,
+    })
+  );
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.set(0, 0, DIM.corridorLength / 2);
+  floor.receiveShadow = true;
+  group.add(floor);
+
+  buildCorridorWall(group, -1);
+  buildCorridorWall(group, 1);
+
+  // Teto liso claro (forro)
+  const ceiling = new THREE.Mesh(
+    new THREE.PlaneGeometry(DIM.corridorWidth, DIM.corridorLength),
+    new THREE.MeshStandardMaterial({ color: COLORS.corridorCeiling, roughness: 1 })
+  );
+  ceiling.rotation.x = Math.PI / 2;
+  ceiling.position.set(0, DIM.corridorHeight, DIM.corridorLength / 2);
+  ceiling.receiveShadow = true;
+  group.add(ceiling);
+
+  // Portas alternadas nos dois lados (salas de aula / escritórios)
+  const halfW = DIM.corridorWidth / 2;
+  const doorHeight = 2.1;
+  [6, 14, 22, 30, 38].forEach((z) => addDoor(group, -halfW + 0.03, z, 1, doorHeight));
+  [10, 18, 26, 34, 42].forEach((z) => addDoor(group, halfW - 0.03, z, -1, doorHeight));
+
+  // Parede de fundo com porta dupla
+  const endWall = new THREE.Mesh(
+    new THREE.PlaneGeometry(DIM.corridorWidth, DIM.corridorHeight),
+    new THREE.MeshStandardMaterial({ color: COLORS.corridorWall, roughness: 0.95 })
+  );
+  endWall.position.set(0, DIM.corridorHeight / 2, DIM.corridorLength);
+  endWall.rotation.y = Math.PI;
+  group.add(endWall);
+
+  const endDoor = new THREE.Mesh(
+    new THREE.BoxGeometry(1.8, 2.2, 0.08),
+    new THREE.MeshStandardMaterial({ color: COLORS.doorPanel, roughness: 0.6 })
+  );
+  endDoor.position.set(0, 1.1, DIM.corridorLength - 0.05);
+  group.add(endDoor);
+
+  addIndoorLighting(group);
+  return { ceiling };
+}
+
+// ---------------------------------------------------------------------------
+// Ambiente 3: calçada (externo) — sem teto, com fachada de um lado e rua do outro
+//
+// A calçada é mais larga que o corredor interno: a fachada fica no limite
+// esquerdo (-3) e o meio-fio é empurrado para +4,2, de modo que postes e
+// árvores fiquem fora da faixa útil de caminhada (o participante chega no
+// máximo a x ~ 2,35 no pico do desvio).
+// ---------------------------------------------------------------------------
+const SIDEWALK_LEFT = -DIM.corridorWidth / 2; // fachada
+const SIDEWALK_RIGHT = 4.2;                   // meio-fio
+const SIDEWALK_WIDTH = SIDEWALK_RIGHT - SIDEWALK_LEFT;
+const SIDEWALK_CENTER = (SIDEWALK_LEFT + SIDEWALK_RIGHT) / 2;
+
+function buildFacade(group) {
+  const x = SIDEWALK_LEFT;
+  const height = 7;
+  const facadeMat = new THREE.MeshStandardMaterial({ color: COLORS.facade, roughness: 0.9 });
+  const windowMat = new THREE.MeshStandardMaterial({
+    color: COLORS.facadeWindow, roughness: 0.2, metalness: 0.3,
+  });
+
+  const wall = new THREE.Mesh(new THREE.BoxGeometry(0.4, height, DIM.corridorLength), facadeMat);
+  wall.position.set(x - 0.2, height / 2, DIM.corridorLength / 2);
+  wall.castShadow = true;
+  wall.receiveShadow = true;
+  group.add(wall);
+
+  // Faixas de janelas em dois pavimentos
+  [2.6, 4.8].forEach((y) => {
+    for (let z = 2; z < DIM.corridorLength - 1; z += 3.2) {
+      const win = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.2, 1.9), windowMat);
+      win.position.set(x + 0.02, y, z);
+      group.add(win);
+    }
+  });
+
+  // Portas de acesso ao nível da calçada
+  [8, 20, 32].forEach((z) => {
+    const door = new THREE.Mesh(
+      new THREE.BoxGeometry(0.08, 2.2, 1.3),
+      new THREE.MeshStandardMaterial({ color: COLORS.doorPanel, roughness: 0.6 })
+    );
+    door.position.set(x + 0.02, 1.1, z);
+    group.add(door);
+  });
+}
+
+function buildStreet(group) {
+  // Meio-fio
+  const curb = new THREE.Mesh(
+    new THREE.BoxGeometry(0.3, 0.16, DIM.corridorLength),
+    new THREE.MeshStandardMaterial({ color: COLORS.curb, roughness: 0.9 })
+  );
+  curb.position.set(SIDEWALK_RIGHT - 0.15, 0.08, DIM.corridorLength / 2);
+  curb.receiveShadow = true;
+  group.add(curb);
+
+  // Asfalto
+  const road = new THREE.Mesh(
+    new THREE.PlaneGeometry(9, DIM.corridorLength),
+    new THREE.MeshStandardMaterial({ color: COLORS.asphalt, roughness: 0.95 })
+  );
+  road.rotation.x = -Math.PI / 2;
+  road.position.set(SIDEWALK_RIGHT + 4.5, 0, DIM.corridorLength / 2);
+  road.receiveShadow = true;
+  group.add(road);
+
+  // Faixa central tracejada
+  const lineMat = new THREE.MeshStandardMaterial({ color: COLORS.roadLine, roughness: 0.8 });
+  for (let z = 1; z < DIM.corridorLength; z += 3) {
+    const dash = new THREE.Mesh(new THREE.PlaneGeometry(0.14, 1.6), lineMat);
+    dash.rotation.x = -Math.PI / 2;
+    dash.position.set(SIDEWALK_RIGHT + 4.5, 0.01, z);
+    group.add(dash);
+  }
+
+  // Carros estacionados junto ao meio-fio
+  [0xb7c4cc, 0x7d3f3f, 0x3b4a5c, 0x8a8f7a].forEach((c, i) => {
+    const car = new THREE.Group();
+    const bodyMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(1.7, 0.62, 4.1),
+      new THREE.MeshStandardMaterial({ color: c, roughness: 0.45, metalness: 0.35 })
+    );
+    bodyMesh.position.y = 0.62;
+    const cabin = new THREE.Mesh(
+      new THREE.BoxGeometry(1.55, 0.5, 2.1),
+      new THREE.MeshStandardMaterial({ color: 0x2c3238, roughness: 0.3, metalness: 0.4 })
+    );
+    cabin.position.set(0, 1.15, -0.2);
+    car.add(bodyMesh, cabin);
+    const wheelGeo = new THREE.CylinderGeometry(0.32, 0.32, 0.22, 12);
+    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x22262a });
+    [[-0.8, 1.4], [0.8, 1.4], [-0.8, -1.4], [0.8, -1.4]].forEach(([wx, wz]) => {
+      const wheel = new THREE.Mesh(wheelGeo, wheelMat);
+      wheel.rotation.z = Math.PI / 2;
+      wheel.position.set(wx, 0.32, wz);
+      car.add(wheel);
+    });
+    car.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    car.position.set(SIDEWALK_RIGHT + 1.6, 0, 6 + i * 9);
+    group.add(car);
+  });
+}
+
+// Postes de iluminação e árvores junto ao meio-fio — fora da faixa de caminhada.
+function buildStreetFurniture(group) {
+  const lineX = SIDEWALK_RIGHT - 0.6; // eixo do mobiliário urbano
+  const postMat = new THREE.MeshStandardMaterial({ color: COLORS.lampPost, roughness: 0.6, metalness: 0.4 });
+  const trunkMat = new THREE.MeshStandardMaterial({ color: COLORS.trunk, roughness: 0.9 });
+  const foliageMat = new THREE.MeshStandardMaterial({ color: COLORS.foliage, roughness: 0.85 });
+
+  [5, 17, 29, 41].forEach((z) => {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 4.6, 10), postMat);
+    post.position.set(lineX, 2.3, z);
+    post.castShadow = true;
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.08, 0.08), postMat);
+    arm.position.set(lineX - 0.35, 4.55, z);
+    const lamp = new THREE.Mesh(
+      new THREE.BoxGeometry(0.42, 0.12, 0.24),
+      new THREE.MeshStandardMaterial({ color: COLORS.fixture, emissive: COLORS.fixture, emissiveIntensity: 0.25 })
+    );
+    lamp.position.set(lineX - 0.67, 4.46, z);
+    group.add(post, arm, lamp);
+  });
+
+  // Árvores em canteiros na calçada
+  [11, 23, 35].forEach((z) => {
+    const pit = new THREE.Mesh(
+      new THREE.BoxGeometry(0.9, 0.04, 0.9),
+      new THREE.MeshStandardMaterial({ color: COLORS.grass, roughness: 1 })
+    );
+    pit.position.set(lineX, 0.02, z);
+    group.add(pit);
+
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.15, 2.2, 8), trunkMat);
+    trunk.position.set(lineX, 1.1, z);
+    trunk.castShadow = true;
+    // Copa acima da altura da cabeça, para não obstruir a caminhada
+    const foliage = new THREE.Mesh(new THREE.SphereGeometry(1.05, 10, 10), foliageMat);
+    foliage.position.set(lineX, 3.0, z);
+    foliage.scale.y = 0.85;
+    foliage.castShadow = true;
+    group.add(trunk, foliage);
+  });
+}
+
+function buildSidewalk(group, scene) {
+  scene.background = new THREE.Color(COLORS.sky);
+  scene.fog = new THREE.Fog(COLORS.sky, 30, 75);
+
+  // Calçada em lajotas (mais larga que o corredor interno)
+  const paving = new THREE.Mesh(
+    new THREE.PlaneGeometry(SIDEWALK_WIDTH, DIM.corridorLength),
+    new THREE.MeshStandardMaterial({
+      map: createGridTexture(COLORS.sidewalkPaving, COLORS.sidewalkJoint, 6, SIDEWALK_WIDTH / 1.2, DIM.corridorLength / 1.2, 3),
+      roughness: 0.95,
+    })
+  );
+  paving.rotation.x = -Math.PI / 2;
+  paving.position.set(SIDEWALK_CENTER, 0, DIM.corridorLength / 2);
+  paving.receiveShadow = true;
+  group.add(paving);
+
+  buildFacade(group);
+  buildStreet(group);
+  buildStreetFurniture(group);
+
+  // Iluminação diurna: sol direcional + céu
+  const sun = new THREE.DirectionalLight(0xfff4e0, 2.1);
+  sun.position.set(-12, 20, 6);
+  sun.target.position.set(0, 0, 14);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.camera.near = 1;
+  sun.shadow.camera.far = 60;
+  sun.shadow.camera.left = -14;
+  sun.shadow.camera.right = 14;
+  sun.shadow.camera.top = 30;
+  sun.shadow.camera.bottom = -10;
+  sun.shadow.bias = -0.0005;
+  group.add(sun, sun.target);
+
+  group.add(new THREE.AmbientLight(0xffffff, 0.55));
+  group.add(new THREE.HemisphereLight(COLORS.sky, 0x9a9384, 0.75));
+
+  return { ceiling: null }; // ambiente externo: não há teto para ocultar
+}
+
+// ---------------------------------------------------------------------------
+// Gerenciador de ambientes
+// ---------------------------------------------------------------------------
+
+const BUILDERS = {
+  biblioteca: buildLibrary,
+  corredor: buildCorridor,
+  calcada: buildSidewalk,
+};
+
+// Remove o ambiente anterior liberando geometrias, materiais, texturas e
+// mapas de sombra das luzes.
+function disposeGroup(scene, group) {
+  group.traverse((obj) => {
+    if (obj.isLight && obj.shadow && obj.shadow.map) obj.shadow.map.dispose();
+    if (obj.geometry) obj.geometry.dispose();
+    if (obj.material) {
+      const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+      mats.forEach((m) => {
+        if (m.map) m.map.dispose();
+        m.dispose();
+      });
+    }
+  });
+  scene.remove(group);
+}
+
+// Constrói o ambiente escolhido num grupo próprio, substituindo o anterior.
+// Retorna `{ ceiling }` — nulo em ambientes externos.
+export function createEnvironmentManager(scene) {
+  let currentGroup = null;
+
+  function load(envId) {
+    const builder = BUILDERS[envId] || BUILDERS.biblioteca;
+    if (currentGroup) disposeGroup(scene, currentGroup);
+    currentGroup = new THREE.Group();
+    currentGroup.name = `environment-${envId}`;
+    const result = builder(currentGroup, scene);
+    scene.add(currentGroup);
+    return result;
+  }
+
+  return { load };
 }

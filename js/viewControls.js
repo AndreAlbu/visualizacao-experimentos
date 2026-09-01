@@ -45,7 +45,7 @@ const FOLLOW_VIEWS = new Set(['egocentric']);
 // câmera segue o participante continuamente e arrastar o mouse gira o olhar
 // em 360° (yaw) e para cima/baixo (pitch) a partir do ponto de vista do
 // operador.
-export function setupViewControls({ camera, controls, buttons, participantGroup, ceiling }) {
+export function setupViewControls({ camera, controls, buttons, participantGroup, ceiling = null }) {
   // Offsets de olhar da visão egocêntrica, controlados pelo arraste do mouse.
   const egoLook = { yaw: 0, pitch: 0 };
   const VIEWS = presets(participantGroup, egoLook);
@@ -141,11 +141,18 @@ export function setupViewControls({ camera, controls, buttons, participantGroup,
     }
   }
 
+  // Troca o teto acompanhado (ao mudar de ambiente). Ambientes externos
+  // passam `null`; nesse caso não há nada para ocultar na visão superior.
+  function setCeiling(newCeiling) {
+    ceiling = newCeiling;
+    if (ceiling) ceiling.visible = activeView !== 'top';
+  }
+
   // Inicia na visão superior (leitura clara do cenário completo)
   camera.position.copy(VIEWS.top.pos);
   controls.target.copy(VIEWS.top.target);
   if (ceiling) ceiling.visible = false;
   buttons.top && buttons.top.classList.add('active');
 
-  return { update, goTo };
+  return { update, goTo, setCeiling };
 }

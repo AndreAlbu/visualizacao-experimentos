@@ -32,6 +32,26 @@ export const COLORS = {
   furnitureRed: 0xe0431c,
   stoolWood: 0xb98a55,
 
+  // Corredor institucional (escola / prédio público): paredes lisas iguais dos dois lados
+  corridorFloor: 0xd9d5cb,
+  corridorFloorGrid: 0xc0bbae,
+  corridorWall: 0xeae8e1,
+  corridorWainscot: 0x9db0ad, // faixa pintada na parte inferior da parede
+  corridorBaseboard: 0x6d7877,
+  corridorCeiling: 0xf5f4f0,
+
+  // Calçada (ambiente externo)
+  sidewalkPaving: 0xcac6bd,
+  sidewalkJoint: 0xa9a59b,
+  curb: 0xb5b1a8,
+  asphalt: 0x494c50,
+  roadLine: 0xd9d2b8,
+  facade: 0xd5cec1,
+  facadeWindow: 0x8ca6b4,
+  sky: 0xc3daea,
+  grass: 0x7d9464,
+  lampPost: 0x545a5f,
+
   participantBody: 0x37454f,
   participantHead: 0x55636d,
   participantAccent: 0x2e86ab,
@@ -71,6 +91,14 @@ export const DIM = {
 export const WALK_SPEED = 1.15; // m/s (ritmo normal de caminhada)
 export const SLOW_SPEED = 0.45; // m/s (aproximação cautelosa do obstáculo)
 export const SLOW_RADIUS = 4.5; // m (raio de influência da desaceleração)
+
+// Ambientes disponíveis no seletor. O layout do experimento (largura útil,
+// trajetórias e obstáculos) é o mesmo em todos; muda o entorno.
+export const ENVIRONMENTS = [
+  { id: 'biblioteca', label: 'Biblioteca' },
+  { id: 'corredor', label: 'Corredor (escola / prédio)' },
+  { id: 'calcada', label: 'Calçada (externo)' },
+];
 
 // Tipos de obstáculo disponíveis no seletor (a ordem define a prioridade de
 // preenchimento das posições/slots do cenário).

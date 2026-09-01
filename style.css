@@ -129,6 +129,19 @@ html, body {
   font-weight: 600;
 }
 
+.env-select {
+  width: 100%;
+  background: #fff;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  padding: 7px 8px;
+  font-size: 12px;
+  font-family: var(--font);
+  color: var(--ink);
+  cursor: pointer;
+}
+.env-select:hover { border-color: var(--accent-blue); }
+
 .panel-subtitle {
   font-weight: 600;
   font-size: 11.5px;

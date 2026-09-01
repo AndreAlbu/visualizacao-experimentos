@@ -303,13 +303,14 @@ function readingNook({ pos, rotY = 0 }) {
   return group;
 }
 
-// Decoração fixa (não participa dos cenários; fica fora da faixa de caminhada).
-export function buildDecor(scene) {
+// Decoração da biblioteca (não participa dos cenários; fica fora da faixa de
+// caminhada). Recebe o grupo do ambiente para ser removida junto com ele.
+export function buildDecor(parent) {
   const stoolObj = stool();
   stoolObj.position.set(-1.7, 0, 30);
   stoolObj.rotation.y = 0.4;
-  scene.add(stoolObj);
+  parent.add(stoolObj);
 
   const nookObj = readingNook(READING_NOOK);
-  scene.add(nookObj);
+  parent.add(nookObj);
 }

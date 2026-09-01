@@ -2,10 +2,9 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 
-import { COLORS, SCENARIOS, OBSTACLE_TYPES, START_LIMITS, START_DEFAULT } from './config.js';
-import { buildEnvironment } from './environment.js';
+import { COLORS, SCENARIOS, OBSTACLE_TYPES, START_LIMITS, START_DEFAULT, ENVIRONMENTS } from './config.js';
+import { createEnvironmentManager } from './environment.js';
 import { createParticipant } from './participant.js';
-import { buildDecor } from './obstacles.js';
 import { createScenarioManager } from './scenarioManager.js';
 import { buildLegend } from './legend.js';
 import { setupViewControls } from './viewControls.js';
@@ -42,8 +41,8 @@ controls.maxDistance = 55;
 controls.maxPolarAngle = Math.PI * 0.495;
 
 // --- Construção da cena -----------------------------------------------------
-const { ceiling } = buildEnvironment(scene);
-buildDecor(scene);
+const environmentManager = createEnvironmentManager(scene);
+const { ceiling } = environmentManager.load(ENVIRONMENTS[0].id);
 
 const participant = createParticipant();
 scene.add(participant.group);
@@ -69,10 +68,33 @@ const animationApi = setupAnimationController({
   },
 });
 
-// --- Menu de cenários, obstáculos e posição inicial ---------------------------
+// --- Menu de ambiente, cenários, obstáculos e posição inicial -----------------
 const scenarioPanel = document.getElementById('scenario-panel');
+
+// Seletor de ambiente: troca todo o entorno mantendo o mesmo protocolo
+const envTitle = document.createElement('div');
+envTitle.className = 'panel-title';
+envTitle.textContent = 'Ambiente';
+scenarioPanel.appendChild(envTitle);
+
+const envSelect = document.createElement('select');
+envSelect.className = 'env-select';
+ENVIRONMENTS.forEach((env) => {
+  const option = document.createElement('option');
+  option.value = env.id;
+  option.textContent = env.label;
+  envSelect.appendChild(option);
+});
+envSelect.addEventListener('change', () => {
+  // O ambiente é reconstruído do zero; o teto acompanhado pela visão
+  // superior muda junto (ambientes externos não têm teto).
+  const built = environmentManager.load(envSelect.value);
+  viewControls.setCeiling(built.ceiling);
+});
+scenarioPanel.appendChild(envSelect);
+
 const scenarioTitle = document.createElement('div');
-scenarioTitle.className = 'panel-title';
+scenarioTitle.className = 'panel-subtitle';
 scenarioTitle.textContent = 'Cenário de navegação';
 scenarioPanel.appendChild(scenarioTitle);
 
