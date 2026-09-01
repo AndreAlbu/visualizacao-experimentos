@@ -438,104 +438,128 @@ function createAisleSignTexture(number) {
   return tex;
 }
 
-// Gôndola de um lado do corredor: painel de fundo, rodapé, prateleiras com
-// faixas de preço e produtos coloridos (via InstancedMesh).
-function buildGondolaSide(group, side, doorZs) {
-  const halfW = DIM.corridorWidth / 2;
-  const backX = side * halfW;
-  const centerX = side * (halfW - GONDOLA_DEPTH / 2);
-  const frontX = side * (halfW - GONDOLA_DEPTH);
-  const levels = [0.2, 0.62, 1.04, 1.46, 1.88]; // alturas das prateleiras
+const GONDOLA_LEVELS = [0.2, 0.62, 1.04, 1.46, 1.88]; // alturas das prateleiras
 
-  const metalMat = new THREE.MeshStandardMaterial({ color: COLORS.marketGondola, roughness: 0.55, metalness: 0.25 });
-  const backMat = new THREE.MeshStandardMaterial({ color: COLORS.marketGondolaBack, roughness: 0.8 });
-  const plinthMat = new THREE.MeshStandardMaterial({ color: COLORS.marketPlinth, roughness: 0.7 });
-  const stripMat = new THREE.MeshStandardMaterial({ color: COLORS.marketPriceStrip, roughness: 0.6 });
+// Materiais compartilhados por todas as gôndolas de um ambiente.
+function createGondolaMaterials() {
+  return {
+    metal: new THREE.MeshStandardMaterial({ color: COLORS.marketGondola, roughness: 0.55, metalness: 0.25 }),
+    back: new THREE.MeshStandardMaterial({ color: COLORS.marketGondolaBack, roughness: 0.8 }),
+    plinth: new THREE.MeshStandardMaterial({ color: COLORS.marketPlinth, roughness: 0.7 }),
+    strip: new THREE.MeshStandardMaterial({ color: COLORS.marketPriceStrip, roughness: 0.6 }),
+    products: COLORS.productColors.map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.75 })),
+  };
+}
 
-  // Painel de fundo contínuo (fecha o corredor visualmente)
-  const back = new THREE.Mesh(
-    new THREE.PlaneGeometry(DIM.corridorLength, GONDOLA_HEIGHT),
-    backMat
-  );
-  back.position.set(backX - side * 0.01, GONDOLA_HEIGHT / 2, DIM.corridorLength / 2);
-  back.rotation.y = side === -1 ? Math.PI / 2 : -Math.PI / 2;
-  back.receiveShadow = true;
-  group.add(back);
+// Uma face de gôndola voltada para o corredor: rodapé, prateleiras, faixas de
+// preço, montantes e produtos. `frontX` é o plano da face aberta e `dir` a
+// direção para onde os produtos apontam (+1 para +x, -1 para -x).
+// Os produtos são acumulados em `products` para virarem InstancedMesh depois.
+function addGondolaRun(group, { frontX, dir, z0, z1, mats, products }) {
+  const centerX = frontX - dir * (GONDOLA_DEPTH / 2);
+  const segLen = z1 - z0;
+  const segCenterZ = (z0 + z1) / 2;
 
-  const productGeo = new THREE.BoxGeometry(0.1, 1, 0.16);
-  const productMats = COLORS.productColors.map(
-    (c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.75 })
-  );
-  const products = [];
+  const plinth = new THREE.Mesh(new THREE.BoxGeometry(GONDOLA_DEPTH, 0.2, segLen), mats.plinth);
+  plinth.position.set(centerX, 0.1, segCenterZ);
+  plinth.castShadow = true;
+  plinth.receiveShadow = true;
+  group.add(plinth);
 
-  computeSegments(DIM.corridorLength, doorZs).forEach(([z0, z1]) => {
-    const segLen = z1 - z0;
-    const segCenterZ = (z0 + z1) / 2;
+  GONDOLA_LEVELS.forEach((y, i) => {
+    const shelf = new THREE.Mesh(new THREE.BoxGeometry(GONDOLA_DEPTH, 0.035, segLen), mats.metal);
+    shelf.position.set(centerX, y, segCenterZ);
+    shelf.castShadow = true;
+    shelf.receiveShadow = true;
+    group.add(shelf);
 
-    // Rodapé da gôndola
-    const plinth = new THREE.Mesh(new THREE.BoxGeometry(GONDOLA_DEPTH, 0.2, segLen), plinthMat);
-    plinth.position.set(centerX, 0.1, segCenterZ);
-    plinth.castShadow = true;
-    plinth.receiveShadow = true;
-    group.add(plinth);
-
-    // Prateleiras + faixa de preço na borda frontal
-    levels.forEach((y, i) => {
-      const shelf = new THREE.Mesh(new THREE.BoxGeometry(GONDOLA_DEPTH, 0.035, segLen), metalMat);
-      shelf.position.set(centerX, y, segCenterZ);
-      shelf.castShadow = true;
-      shelf.receiveShadow = true;
-      group.add(shelf);
-
-      if (i < levels.length - 1) {
-        const strip = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.05, segLen), stripMat);
-        strip.position.set(frontX + side * 0.01, y + 0.04, segCenterZ);
-        group.add(strip);
-      }
-    });
-
-    // Montantes verticais
-    const postCount = Math.max(2, Math.round(segLen / 1.4) + 1);
-    for (let i = 0; i < postCount; i++) {
-      const z = z0 + (segLen * i) / (postCount - 1);
-      const post = new THREE.Mesh(new THREE.BoxGeometry(GONDOLA_DEPTH, GONDOLA_HEIGHT, 0.04), metalMat);
-      post.position.set(centerX, GONDOLA_HEIGHT / 2, z);
-      group.add(post);
+    if (i < GONDOLA_LEVELS.length - 1) {
+      const strip = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.05, segLen), mats.strip);
+      strip.position.set(frontX + dir * 0.01, y + 0.04, segCenterZ);
+      group.add(strip);
     }
-
-    // Produtos: fileiras densas em cada prateleira
-    levels.slice(0, -1).forEach((y) => {
-      const count = Math.round(segLen / 0.12);
-      for (let i = 0; i < count; i++) {
-        const z = z0 + 0.08 + i * 0.12;
-        if (z > z1 - 0.08) continue;
-        products.push({
-          x: centerX + (Math.random() - 0.5) * 0.12,
-          y: y + 0.02,
-          z,
-          scaleY: 0.18 + Math.random() * 0.14,
-          mat: Math.floor(Math.random() * productMats.length),
-        });
-      }
-    });
   });
 
-  // Um InstancedMesh por cor de produto
-  productMats.forEach((mat, matIndex) => {
+  const postCount = Math.max(2, Math.round(segLen / 1.4) + 1);
+  for (let i = 0; i < postCount; i++) {
+    const z = z0 + (segLen * i) / (postCount - 1);
+    const post = new THREE.Mesh(new THREE.BoxGeometry(GONDOLA_DEPTH, GONDOLA_HEIGHT, 0.04), mats.metal);
+    post.position.set(centerX, GONDOLA_HEIGHT / 2, z);
+    group.add(post);
+  }
+
+  GONDOLA_LEVELS.slice(0, -1).forEach((y) => {
+    const count = Math.round(segLen / 0.12);
+    for (let i = 0; i < count; i++) {
+      const z = z0 + 0.08 + i * 0.12;
+      if (z > z1 - 0.08) continue;
+      products.push({
+        x: centerX + (Math.random() - 0.5) * 0.12,
+        y: y + 0.02,
+        z,
+        scaleY: 0.18 + Math.random() * 0.14,
+        mat: Math.floor(Math.random() * mats.products.length),
+      });
+    }
+  });
+}
+
+// Converte os produtos acumulados em InstancedMesh (um por cor).
+function flushProducts(group, mats, products) {
+  const geo = new THREE.BoxGeometry(0.1, 1, 0.16);
+  mats.products.forEach((mat, matIndex) => {
     const items = products.filter((p) => p.mat === matIndex);
     if (!items.length) return;
-    const mesh = new THREE.InstancedMesh(productGeo, mat, items.length);
+    const mesh = new THREE.InstancedMesh(geo, mat, items.length);
     mesh.castShadow = true;
     const dummy = new THREE.Object3D();
     items.forEach((p, i) => {
       // A geometria tem altura 1 e origem no centro: sobe metade da escala
-      dummy.position.set(p.x, p.y + (p.scaleY / 2), p.z);
+      dummy.position.set(p.x, p.y + p.scaleY / 2, p.z);
       dummy.scale.set(1, p.scaleY, 1);
       dummy.updateMatrix();
       mesh.setMatrixAt(i, dummy.matrix);
     });
     mesh.instanceMatrix.needsUpdate = true;
     group.add(mesh);
+  });
+}
+
+// Gôndola encostada na parede, de um lado do corredor único.
+function buildGondolaSide(group, side, doorZs, mats, products) {
+  const halfW = DIM.corridorWidth / 2;
+  const frontX = side * (halfW - GONDOLA_DEPTH);
+
+  // Painel de fundo contínuo (fecha o corredor visualmente)
+  const back = new THREE.Mesh(
+    new THREE.PlaneGeometry(DIM.corridorLength, GONDOLA_HEIGHT),
+    mats.back
+  );
+  back.position.set(side * halfW - side * 0.01, GONDOLA_HEIGHT / 2, DIM.corridorLength / 2);
+  back.rotation.y = side === -1 ? Math.PI / 2 : -Math.PI / 2;
+  back.receiveShadow = true;
+  group.add(back);
+
+  computeSegments(DIM.corridorLength, doorZs).forEach(([z0, z1]) => {
+    addGondolaRun(group, { frontX, dir: -side, z0, z1, mats, products });
+  });
+}
+
+// Ilha de gôndolas: duas faces costa a costa, servindo os corredores dos dois
+// lados. `x0`/`x1` são as faces abertas do bloco.
+function buildGondolaBlock(group, x0, x1, z0, z1, mats, products) {
+  addGondolaRun(group, { frontX: x0, dir: -1, z0, z1, mats, products });
+  addGondolaRun(group, { frontX: x1, dir: 1, z0, z1, mats, products });
+
+  // Tampas nas pontas do bloco
+  [z0, z1].forEach((z) => {
+    const cap = new THREE.Mesh(
+      new THREE.BoxGeometry(x1 - x0, GONDOLA_HEIGHT, 0.05),
+      mats.back
+    );
+    cap.position.set((x0 + x1) / 2, GONDOLA_HEIGHT / 2, z);
+    cap.castShadow = true;
+    group.add(cap);
   });
 }
 
@@ -591,8 +615,11 @@ function buildSupermarket(group, scene) {
   floor.receiveShadow = true;
   group.add(floor);
 
-  buildGondolaSide(group, -1, DOORS_LEFT_Z);
-  buildGondolaSide(group, 1, DOORS_RIGHT_Z);
+  const mats = createGondolaMaterials();
+  const products = [];
+  buildGondolaSide(group, -1, DOORS_LEFT_Z, mats, products);
+  buildGondolaSide(group, 1, DOORS_RIGHT_Z, mats, products);
+  flushProducts(group, mats, products);
 
   // Teto claro
   const ceiling = new THREE.Mesh(
@@ -640,7 +667,158 @@ function buildSupermarket(group, scene) {
 }
 
 // ---------------------------------------------------------------------------
-// Ambiente 4: calçada (externo) — sem teto, com fachada de um lado e rua do outro
+// Ambiente 4: supermercado complexo — malha de corredores
+//
+// Planta: corredores longitudinais (em z) nos eixos x = 0, ±4 e ±8, cortados
+// por dois corredores transversais. As ilhas de gôndola ocupam o miolo. É essa
+// grade que permite o percurso com várias curvas do cenário "Múltiplos desvios".
+// ---------------------------------------------------------------------------
+const STORE_HALF_X = 10.5;
+const STORE_Z = 34;
+// Faces abertas de cada ilha (x0, x1) e trechos em z entre os transversais
+const STORE_BLOCK_X = [[1.5, 2.5], [-2.5, -1.5], [5.5, 6.5], [-6.5, -5.5]];
+const STORE_BLOCK_Z = [[3, 12], [15, 24], [27, 32]];
+const STORE_AISLE_X = [0, 4, -4, 8, -8]; // eixos dos corredores longitudinais
+
+function buildComplexSupermarket(group, scene) {
+  scene.background = new THREE.Color(COLORS.marketCeiling);
+  scene.fog = new THREE.Fog(COLORS.marketCeiling, 30, 70);
+
+  // Piso da loja inteira
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(STORE_HALF_X * 2, STORE_Z),
+    new THREE.MeshStandardMaterial({
+      map: createGridTexture(COLORS.marketFloor, COLORS.marketFloorGrid, 5, STORE_HALF_X * 2 / 1.2, STORE_Z / 1.2),
+      roughness: 0.45,
+      metalness: 0.05,
+    })
+  );
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.set(0, 0, STORE_Z / 2);
+  floor.receiveShadow = true;
+  group.add(floor);
+
+  // Ilhas de gôndola
+  const mats = createGondolaMaterials();
+  const products = [];
+  STORE_BLOCK_X.forEach(([x0, x1]) => {
+    STORE_BLOCK_Z.forEach(([z0, z1]) => {
+      buildGondolaBlock(group, x0, x1, z0, z1, mats, products);
+    });
+  });
+  flushProducts(group, mats, products);
+
+  // Paredes externas e teto
+  const wallMat = new THREE.MeshStandardMaterial({ color: COLORS.marketGondolaBack, roughness: 0.9 });
+  [-1, 1].forEach((side) => {
+    const wall = new THREE.Mesh(new THREE.PlaneGeometry(STORE_Z, DIM.corridorHeight), wallMat);
+    wall.position.set(side * STORE_HALF_X, DIM.corridorHeight / 2, STORE_Z / 2);
+    wall.rotation.y = side === -1 ? Math.PI / 2 : -Math.PI / 2;
+    wall.receiveShadow = true;
+    group.add(wall);
+  });
+  [[0, Math.PI], [STORE_Z, 0]].forEach(([z, rotY]) => {
+    const wall = new THREE.Mesh(new THREE.PlaneGeometry(STORE_HALF_X * 2, DIM.corridorHeight), wallMat);
+    wall.position.set(0, DIM.corridorHeight / 2, z);
+    wall.rotation.y = rotY;
+    group.add(wall);
+  });
+
+  const ceiling = new THREE.Mesh(
+    new THREE.PlaneGeometry(STORE_HALF_X * 2, STORE_Z),
+    new THREE.MeshStandardMaterial({ color: COLORS.marketCeiling, roughness: 1 })
+  );
+  ceiling.rotation.x = Math.PI / 2;
+  ceiling.position.set(0, DIM.corridorHeight, STORE_Z / 2);
+  ceiling.receiveShadow = true;
+  group.add(ceiling);
+
+  // Ilha de refrigeradores na parede do fundo
+  for (let i = 0; i < 6; i++) {
+    const cooler = new THREE.Mesh(
+      new THREE.BoxGeometry(1.3, 2.1, 0.5),
+      new THREE.MeshStandardMaterial({
+        color: COLORS.marketCooler, roughness: 0.25, metalness: 0.15,
+        emissive: 0x213038, emissiveIntensity: 0.25,
+      })
+    );
+    cooler.position.set(-3.75 + i * 1.5, 1.05, STORE_Z - 0.35);
+    cooler.castShadow = true;
+    group.add(cooler);
+  }
+
+  // Placas numeradas sobre cada corredor longitudinal
+  STORE_AISLE_X.forEach((x, i) => {
+    const tex = createAisleSignTexture(i + 1);
+    const faceMat = new THREE.MeshStandardMaterial({ color: COLORS.marketSign, roughness: 0.7 });
+    const plate = new THREE.Mesh(
+      new THREE.BoxGeometry(1.1, 0.55, 0.04),
+      [faceMat, faceMat, faceMat, faceMat,
+        new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7 }),
+        new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7 })]
+    );
+    const signY = 3.05;
+    plate.position.set(x, signY, 8);
+    plate.castShadow = true;
+    group.add(plate);
+
+    const rodLength = DIM.corridorHeight - (signY + 0.275);
+    [-0.45, 0.45].forEach((dx) => {
+      const rod = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.012, 0.012, rodLength, 6),
+        new THREE.MeshStandardMaterial({ color: COLORS.obstacleMetal, metalness: 0.6 })
+      );
+      rod.position.set(x + dx, signY + 0.275 + rodLength / 2, 8);
+      group.add(rod);
+    });
+  });
+
+  // Iluminação: luminárias sobre os corredores + luz zenital para as sombras
+  [6, 13.5, 20, 25.5, 31].forEach((z) => {
+    [0, 4, -4, 8, -8].forEach((x) => {
+      const fixture = new THREE.Mesh(
+        new THREE.BoxGeometry(2.2, 0.06, 0.16),
+        new THREE.MeshStandardMaterial({
+          color: COLORS.fixture, emissive: COLORS.fixture, emissiveIntensity: 0.8, roughness: 0.4,
+        })
+      );
+      fixture.position.set(x, DIM.corridorHeight - 0.08, z);
+      group.add(fixture);
+    });
+  });
+  // Poucas luzes pontuais (custo por luz é alto); o volume vem de ambiente + zenital
+  [[0, 9], [0, 25], [4, 17], [-4, 17]].forEach(([x, z]) => {
+    const light = new THREE.PointLight(0xfff6df, 4.5, 14, 2);
+    light.position.set(x, DIM.corridorHeight - 0.4, z);
+    group.add(light);
+  });
+
+  const overhead = new THREE.DirectionalLight(0xffffff, 0.9);
+  overhead.position.set(3, 14, 12);
+  overhead.target.position.set(0, 0, 16);
+  overhead.castShadow = true;
+  overhead.shadow.mapSize.set(2048, 2048);
+  overhead.shadow.camera.near = 1;
+  overhead.shadow.camera.far = 40;
+  overhead.shadow.camera.left = -14;
+  overhead.shadow.camera.right = 14;
+  overhead.shadow.camera.top = 22;
+  overhead.shadow.camera.bottom = -22;
+  overhead.shadow.bias = -0.0005;
+  group.add(overhead, overhead.target);
+
+  group.add(new THREE.AmbientLight(0xffffff, 0.68));
+  group.add(new THREE.HemisphereLight(0xf4f6f7, 0x9aa0a4, 0.5));
+
+  // A loja é bem maior que um corredor: a visão superior sobe para enquadrá-la
+  return {
+    ceiling,
+    topView: { pos: [0, 40, STORE_Z / 2], target: [0, 0, STORE_Z / 2] },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Ambiente 5: calçada (externo) — sem teto, com fachada de um lado e rua do outro
 //
 // A calçada é mais larga que o corredor interno: a fachada fica no limite
 // esquerdo (-3) e o meio-fio é empurrado para +4,2, de modo que postes e
@@ -835,6 +1013,7 @@ const BUILDERS = {
   biblioteca: buildLibrary,
   corredor: buildCorridor,
   supermercado: buildSupermarket,
+  'supermercado-complexo': buildComplexSupermarket,
   calcada: buildSidewalk,
 };
 

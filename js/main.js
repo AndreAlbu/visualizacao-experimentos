@@ -111,8 +111,11 @@ envSelect.addEventListener('change', () => {
   currentEnvId = envSelect.value;
   const built = environmentManager.load(currentEnvId);
   viewControls.setCeiling(built.ceiling);
-  renderObstacleChecks();
-  rebuildScenario();
+  viewControls.setTopView(built.topView);
+  // Mantém o cenário atual se ele existir no novo ambiente; senão, cai no primeiro
+  const available = scenariosForEnv(currentEnvId);
+  const next = available.some((s) => s.id === currentScenarioId) ? currentScenarioId : available[0].id;
+  selectScenario(next);
 });
 scenarioPanel.appendChild(envSelect);
 
@@ -121,15 +124,26 @@ scenarioTitle.className = 'panel-subtitle';
 scenarioTitle.textContent = 'Cenário de navegação';
 scenarioPanel.appendChild(scenarioTitle);
 
-const scenarioButtons = new Map();
-SCENARIOS.forEach((s, i) => {
-  const btn = document.createElement('button');
-  btn.className = 'scenario-btn';
-  btn.textContent = `${i + 1}. ${s.label}`;
-  btn.addEventListener('click', () => selectScenario(s.id));
-  scenarioPanel.appendChild(btn);
-  scenarioButtons.set(s.id, btn);
-});
+const scenarioList = document.createElement('div');
+scenarioList.className = 'scenario-list';
+scenarioPanel.appendChild(scenarioList);
+
+// Cenários válidos no ambiente ativo (o supermercado complexo tem os seus).
+function scenariosForEnv(envId) {
+  return SCENARIOS.filter((s) => s.envs.includes(envId));
+}
+
+function renderScenarioButtons() {
+  scenarioList.innerHTML = '';
+  scenariosForEnv(currentEnvId).forEach((s, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'scenario-btn';
+    if (s.id === currentScenarioId) btn.classList.add('active');
+    btn.textContent = `${i + 1}. ${s.label}`;
+    btn.addEventListener('click', () => selectScenario(s.id));
+    scenarioList.appendChild(btn);
+  });
+}
 
 let currentScenarioId = SCENARIOS[0].id;
 
@@ -224,6 +238,7 @@ function makeStartSlider(labelText, axis, [min, max]) {
   const label = document.createElement('span');
   const input = document.createElement('input');
   input.type = 'range';
+  input.dataset.axis = axis;
   input.min = String(min);
   input.max = String(max);
   input.step = '0.1';
@@ -275,9 +290,16 @@ function selectScenario(id) {
   if (scenario.obstacleSlots && selection.size === 0) {
     defaultsFor(currentEnvId, id).forEach((t) => selection.add(t));
   }
+  // Em percursos presos à malha de corredores o deslocamento lateral não se
+  // aplica: mover a faixa jogaria a trajetória para dentro das gôndolas.
+  const lateral = scenarioPanel.querySelector('.start-slider input[data-axis="x"]');
+  if (lateral) {
+    lateral.disabled = Boolean(scenario.fixedLane);
+    lateral.parentElement.classList.toggle('disabled', Boolean(scenario.fixedLane));
+  }
+  renderScenarioButtons();
   renderObstacleChecks();
   rebuildScenario();
-  scenarioButtons.forEach((btn, key) => btn.classList.toggle('active', key === id));
 }
 
 // Cenário inicial

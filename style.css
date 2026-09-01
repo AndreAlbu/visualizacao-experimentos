@@ -114,6 +114,11 @@ html, body {
   max-height: calc(100% - 28px);
   overflow-y: auto;
 }
+.scenario-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
 .scenario-btn {
   background: #fff;
   border: 1px solid var(--panel-border);
@@ -183,6 +188,8 @@ html, body {
   width: 100%;
   accent-color: var(--accent-blue);
 }
+.start-slider.disabled { opacity: 0.45; }
+.start-slider.disabled input { cursor: default; }
 
 /* ---------- HUD de gravação (visão egocêntrica) ---------- */
 .rec-hud {

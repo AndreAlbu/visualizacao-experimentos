@@ -44,26 +44,37 @@ export function buildTrajectory(group, scenario) {
   mainLabel.position.set(labelAnchor.x, 0.05, labelAnchor.z);
   group.add(mainLabel);
 
-  // Trecho de desvio (parte da trajetória principal, destacado em verde)
+  // Trechos de desvio destacados em verde. `detourZ` define uma faixa de z
+  // (percursos retos); `detourT` define frações do percurso, usado quando a
+  // trajetória muda de direção e o z sozinho não identifica a manobra.
+  const detourRanges = [];
   if (scenario.detourZ) {
     const [z0, z1] = scenario.detourZ;
-    const avoidPts = samples.filter((p) => p.z > z0 && p.z < z1);
-    if (avoidPts.length > 1) {
-      const avoidGeo = new THREE.BufferGeometry().setFromPoints(
-        avoidPts.map((p) => new THREE.Vector3(p.x, 0.025, p.z))
-      );
-      const avoidLine = new THREE.Line(
-        avoidGeo,
-        new THREE.LineBasicMaterial({ color: COLORS.avoidance })
-      );
-      group.add(avoidLine);
+    detourRanges.push(samples.filter((p) => p.z > z0 && p.z < z1));
+  }
+  if (scenario.detourT) {
+    scenario.detourT.forEach(([t0, t1]) => {
+      const i0 = Math.floor(t0 * (samples.length - 1));
+      const i1 = Math.ceil(t1 * (samples.length - 1));
+      detourRanges.push(samples.slice(i0, i1 + 1));
+    });
+  }
 
+  detourRanges.forEach((avoidPts, index) => {
+    if (avoidPts.length < 2) return;
+    const avoidGeo = new THREE.BufferGeometry().setFromPoints(
+      avoidPts.map((p) => new THREE.Vector3(p.x, 0.025, p.z))
+    );
+    group.add(new THREE.Line(avoidGeo, new THREE.LineBasicMaterial({ color: COLORS.avoidance })));
+
+    // Um único rótulo, no primeiro trecho, para não poluir a cena
+    if (index === 0) {
       const mid = avoidPts[Math.floor(avoidPts.length / 2)];
       const avoidLabel = createLabel('Trajetória de desvio', 'green');
       avoidLabel.position.set(mid.x, 0.05, mid.z);
       group.add(avoidLabel);
     }
-  }
+  });
 
   // Linha-fantasma: curso original em linha reta que atravessaria o obstáculo
   if (scenario.ghost) {

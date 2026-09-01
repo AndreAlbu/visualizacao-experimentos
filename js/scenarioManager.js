@@ -30,7 +30,8 @@ function disposeGroup(scene, group) {
 // - `start.z` ajusta apenas a distância do ponto de partida até o obstáculo;
 // - `types` (ids de OBSTACLE_TYPES) preenche os slots de obstáculo do cenário.
 function effectiveScenario(scenario, options = {}) {
-  const laneX = options.start ? options.start.x : 0;
+  // Percursos presos à malha de corredores ignoram o deslocamento lateral
+  const laneX = options.start && !scenario.fixedLane ? options.start.x : 0;
 
   // Toda a geometria base é definida na faixa central (x = 0) e transladada
   // lateralmente por laneX.

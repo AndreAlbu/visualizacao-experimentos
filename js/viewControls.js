@@ -10,6 +10,7 @@ const Y_AXIS = new THREE.Vector3(0, 1, 0);
 function presets(participantGroup, egoLook) {
   return {
     // Enquadra a zona dos cenários (START -> obstáculo -> END, z ~ 2..23).
+    // Ambientes maiores (ex.: supermercado complexo) sobrescrevem via setTopView.
     top: {
       pos: new THREE.Vector3(0.2, 32, 12.5),
       target: new THREE.Vector3(0.2, 0, 12.5),
@@ -152,11 +153,25 @@ export function setupViewControls({
     if (ceiling) ceiling.visible = activeView !== 'top';
   }
 
+  // Ajusta o enquadramento da visão superior ao ambiente ativo (lojas grandes
+  // precisam de uma câmera mais alta que um corredor). `preset` é opcional:
+  // sem ele, volta ao enquadramento padrão.
+  const DEFAULT_TOP = {
+    pos: VIEWS.top.pos.clone(),
+    target: VIEWS.top.target.clone(),
+  };
+  function setTopView(preset) {
+    VIEWS.top.pos.copy(preset ? new THREE.Vector3(...preset.pos) : DEFAULT_TOP.pos);
+    VIEWS.top.target.copy(preset ? new THREE.Vector3(...preset.target) : DEFAULT_TOP.target);
+    // Se a visão superior já está ativa, reenquadra imediatamente
+    if (activeView === 'top' && !tween) goTo('top');
+  }
+
   // Inicia na visão superior (leitura clara do cenário completo)
   camera.position.copy(VIEWS.top.pos);
   controls.target.copy(VIEWS.top.target);
   if (ceiling) ceiling.visible = false;
   buttons.top && buttons.top.classList.add('active');
 
-  return { update, goTo, setCeiling };
+  return { update, goTo, setCeiling, setTopView };
 }

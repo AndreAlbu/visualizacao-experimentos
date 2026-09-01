@@ -119,16 +119,23 @@ export const SLOW_RADIUS = 4.5; // m (raio de influência da desaceleração)
 // trajetórias e obstáculos) é o mesmo em todos; muda o entorno.
 export const ENVIRONMENTS = [
   { id: 'biblioteca', label: 'Biblioteca' },
-  { id: 'corredor', label: 'Corredor (escola / prédio)' },
-  { id: 'supermercado', label: 'Supermercado' },
-  { id: 'calcada', label: 'Calçada (externo)' },
+  { id: 'corredor', label: 'Corredores' },
+  { id: 'supermercado', label: 'Supermercado simples' },
+  { id: 'supermercado-complexo', label: 'Supermercado complexo' },
+  { id: 'calcada', label: 'Calçada' },
 ];
 
 // Tipos de obstáculo disponíveis no seletor (a ordem define a prioridade de
 // preenchimento das posições/slots do cenário). `envs` limita cada tipo aos
 // ambientes onde ele faz sentido.
 const STUDY = ['biblioteca', 'corredor']; // ambientes com mobiliário de estudo
-const ALL_ENVS = ['biblioteca', 'corredor', 'supermercado', 'calcada'];
+const MARKETS = ['supermercado', 'supermercado-complexo'];
+const ALL_ENVS = ['biblioteca', 'corredor', 'supermercado', 'supermercado-complexo', 'calcada'];
+
+// Ambientes de corredor único, onde valem os cenários lineares do protocolo
+// (reta -> obstáculo -> desvio/parada). O supermercado complexo tem malha de
+// corredores e usa um percurso próprio, com várias curvas.
+const LINEAR_ENVS = ['biblioteca', 'corredor', 'supermercado', 'calcada'];
 
 export const OBSTACLE_TYPES = [
   // Presentes em qualquer ambiente
@@ -138,10 +145,10 @@ export const OBSTACLE_TYPES = [
   // Mobiliário interno
   { id: 'mesa', label: 'Mesa', envs: STUDY },
   { id: 'cadeira', label: 'Cadeira', envs: STUDY },
-  { id: 'carrinho', label: 'Carrinho', envs: ['biblioteca', 'corredor', 'supermercado'] },
+  { id: 'carrinho', label: 'Carrinho', envs: ['biblioteca', 'corredor', ...MARKETS] },
   // Típicos de supermercado
-  { id: 'expositor', label: 'Expositor promocional', envs: ['supermercado'] },
-  { id: 'palete', label: 'Palete de reposição', envs: ['supermercado'] },
+  { id: 'expositor', label: 'Expositor promocional', envs: MARKETS },
+  { id: 'palete', label: 'Palete de reposição', envs: MARKETS },
   // Objetos típicos de via pública
   { id: 'banca', label: 'Banca / quiosque', envs: ['calcada'] },
   { id: 'lixeira', label: 'Lixeira', envs: ['calcada'] },
@@ -160,6 +167,7 @@ export const START_DEFAULT = { x: 0, z: 2 };
 export const SCENARIOS = [
   {
     id: 'desvio-esquerda',
+    envs: LINEAR_ENVS,
     label: 'Desvio à esquerda',
     requireObstacle: true, // não faz sentido desviar de nada: sempre ao menos 1 obstáculo
     speed: WALK_SPEED,
@@ -190,6 +198,7 @@ export const SCENARIOS = [
   },
   {
     id: 'desvio-direita',
+    envs: LINEAR_ENVS,
     label: 'Desvio à direita',
     requireObstacle: true, // não faz sentido desviar de nada: sempre ao menos 1 obstáculo
     speed: WALK_SPEED,
@@ -212,6 +221,7 @@ export const SCENARIOS = [
   },
   {
     id: 'aproximacao-parada',
+    envs: LINEAR_ENVS,
     label: 'Parada',
     requireObstacle: true, // a parada só existe se houver bloqueio: sempre ao menos 1 obstáculo
     speed: WALK_SPEED,
@@ -232,6 +242,7 @@ export const SCENARIOS = [
   },
   {
     id: 'caminhada-livre',
+    envs: LINEAR_ENVS,
     label: 'Caminho livre',
     speed: 1.7, // caminhada livre: ritmo mais acelerado
     path: [
@@ -241,6 +252,54 @@ export const SCENARIOS = [
     markers: [
       { id: 'START', pos: [0, 0, 2] },
       { id: 'END', pos: [0, 0, 36] },
+    ],
+  },
+
+  // --- Cenários do supermercado complexo (malha de corredores) --------------
+  {
+    id: 'multiplos-desvios',
+    fixedLane: true, // presa à malha de corredores: sem deslocamento lateral
+    envs: ['supermercado-complexo'],
+    label: 'Múltiplos desvios',
+    requireObstacle: true,
+    speed: WALK_SPEED,
+    stop: true, // termina bloqueado por caixas no corredor transversal
+    // Percurso: sobe o corredor central, entra no transversal, sobe outro
+    // corredor e vira de novo, parando diante das caixas.
+    path: [
+      [0, 0, 2], [0, 0, 9], [0, 0, 11.8],
+      [0.6, 0, 13.0], [1.9, 0, 13.5], [3.1, 0, 13.5],
+      [3.9, 0, 14.6], [4, 0, 17], [4, 0, 21], [4, 0, 23.2],
+      [3.4, 0, 24.8], [2.3, 0, 25.5], [1.2, 0, 25.5],
+    ],
+    // Trechos de manobra destacados (frações do percurso, e não faixas de z,
+    // porque aqui a trajetória muda de direção várias vezes).
+    detourT: [[0.34, 0.50], [0.51, 0.62], [0.85, 1.0]],
+    risk: { center: [-0.6, 0, 25.5], radius: 1.9 },
+    obstacleSlots: [[0, 0], [0, 0.85], [0, -0.85], [-1.0, 0.4], [-1.0, -0.45]],
+    obstacleLabel: 'Obstáculo (passagem bloqueada)',
+    defaultObstacles: ['palete', 'caixa', 'expositor'],
+    markers: [
+      { id: 'START', pos: [0, 0, 2] },
+      { id: 'T1', pos: [0, 0, 11.8] },
+      { id: 'T2', pos: [3.9, 0, 14.6] },
+      { id: 'T3', pos: [4, 0, 23.2] },
+      { id: 'PARADA', pos: [1.2, 0, 25.5] },
+    ],
+  },
+  {
+    id: 'complexo-livre',
+    fixedLane: true, // presa à malha de corredores: sem deslocamento lateral
+    envs: ['supermercado-complexo'],
+    label: 'Caminho livre',
+    speed: 1.6,
+    path: [
+      [0, 0, 2], [0, 0, 12], [0, 0, 22], [0, 0, 31],
+    ],
+    defaultObstacles: [],
+    markers: [
+      { id: 'START', pos: [0, 0, 2] },
+      { id: 'END', pos: [0, 0, 31] },
     ],
   },
 ];
