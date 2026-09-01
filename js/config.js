@@ -52,6 +52,21 @@ export const COLORS = {
   grass: 0x7d9464,
   lampPost: 0x545a5f,
 
+  // Supermercado: gôndolas metálicas claras e produtos coloridos
+  marketFloor: 0xe6e5e1,
+  marketFloorGrid: 0xd2d0cb,
+  marketGondola: 0xc2c6ca,
+  marketGondolaBack: 0xd8dbde,
+  marketPlinth: 0x8b9095,
+  marketPriceStrip: 0xf6f4ee,
+  marketSign: 0x2f6f9e,
+  marketCeiling: 0xedebe6,
+  marketCooler: 0x9fb6bd,
+  productColors: [
+    0xc0563a, 0xd8a13c, 0x4a7c59, 0x3d6b8a, 0x8c5a7a,
+    0xb5603f, 0x5f8fa8, 0xa8a24b, 0x7a6bab, 0xd07f4a,
+  ],
+
   // Obstáculos de rua
   binBody: 0x4d6b56,
   bikeFrame: 0x2f5d6b,
@@ -105,14 +120,15 @@ export const SLOW_RADIUS = 4.5; // m (raio de influência da desaceleração)
 export const ENVIRONMENTS = [
   { id: 'biblioteca', label: 'Biblioteca' },
   { id: 'corredor', label: 'Corredor (escola / prédio)' },
+  { id: 'supermercado', label: 'Supermercado' },
   { id: 'calcada', label: 'Calçada (externo)' },
 ];
 
 // Tipos de obstáculo disponíveis no seletor (a ordem define a prioridade de
 // preenchimento das posições/slots do cenário). `envs` limita cada tipo aos
 // ambientes onde ele faz sentido.
-const INDOOR = ['biblioteca', 'corredor'];
-const ALL_ENVS = ['biblioteca', 'corredor', 'calcada'];
+const STUDY = ['biblioteca', 'corredor']; // ambientes com mobiliário de estudo
+const ALL_ENVS = ['biblioteca', 'corredor', 'supermercado', 'calcada'];
 
 export const OBSTACLE_TYPES = [
   // Presentes em qualquer ambiente
@@ -120,9 +136,12 @@ export const OBSTACLE_TYPES = [
   { id: 'pessoa', label: 'Uma pessoa', envs: ALL_ENVS },
   { id: 'caixa', label: 'Caixa', envs: ALL_ENVS },
   // Mobiliário interno
-  { id: 'mesa', label: 'Mesa', envs: INDOOR },
-  { id: 'cadeira', label: 'Cadeira', envs: INDOOR },
-  { id: 'carrinho', label: 'Carrinho', envs: INDOOR },
+  { id: 'mesa', label: 'Mesa', envs: STUDY },
+  { id: 'cadeira', label: 'Cadeira', envs: STUDY },
+  { id: 'carrinho', label: 'Carrinho', envs: ['biblioteca', 'corredor', 'supermercado'] },
+  // Típicos de supermercado
+  { id: 'expositor', label: 'Expositor promocional', envs: ['supermercado'] },
+  { id: 'palete', label: 'Palete de reposição', envs: ['supermercado'] },
   // Objetos típicos de via pública
   { id: 'banca', label: 'Banca / quiosque', envs: ['calcada'] },
   { id: 'lixeira', label: 'Lixeira', envs: ['calcada'] },
@@ -161,7 +180,7 @@ export const SCENARIOS = [
     obstacleSlots: [[0, 0], [0, 0.8], [0, -0.8], [0, 1.4], [0, -1.4]],
     // Os padrões são filtrados pelos tipos disponíveis no ambiente ativo
     // (ex.: 'mesa' em ambientes internos, 'banca' na calçada).
-    defaultObstacles: ['mesa', 'banca'],
+    defaultObstacles: ['mesa', 'expositor', 'banca'],
     markers: [
       { id: 'START', pos: [0, 0, 2] },
       { id: 'T1', pos: [0, 0, 12] },
@@ -204,7 +223,7 @@ export const SCENARIOS = [
     // Slots distribuídos pela largura do corredor (bloqueio da passagem).
     obstacleSlots: [[-1.3, 0.1], [0.5, 0], [1.5, 0.1], [-0.5, 0.8], [1.0, 0.9]],
     obstacleLabel: 'Obstáculo (passagem bloqueada)',
-    defaultObstacles: ['mesa', 'banca', 'duas-pessoas', 'pessoa'],
+    defaultObstacles: ['mesa', 'expositor', 'banca', 'duas-pessoas', 'pessoa'],
     markers: [
       { id: 'START', pos: [0, 0, 2] },
       { id: 'T1', pos: [0, 0, 10] },

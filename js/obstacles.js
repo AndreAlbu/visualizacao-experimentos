@@ -155,6 +155,83 @@ function cart() {
   return group;
 }
 
+// --- Objetos típicos de supermercado ---------------------------------------
+
+// Expositor promocional (ilha de produtos no meio do corredor).
+function promoDisplay() {
+  const group = new THREE.Group();
+  const baseMat = new THREE.MeshStandardMaterial({ color: 0xb8452f, roughness: 0.8 });
+
+  const base = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.75, 0.7), baseMat);
+  base.position.y = 0.375;
+  group.add(base);
+
+  // Placa de preço no topo
+  const sign = new THREE.Mesh(
+    new THREE.BoxGeometry(0.7, 0.3, 0.03),
+    new THREE.MeshStandardMaterial({ color: 0xe8c33f, roughness: 0.7 })
+  );
+  sign.position.set(0, 1.35, 0);
+  group.add(sign);
+
+  const signPost = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.018, 0.018, 0.4, 8),
+    new THREE.MeshStandardMaterial({ color: COLORS.obstacleMetal, metalness: 0.5 })
+  );
+  signPost.position.set(0, 1.0, 0);
+  group.add(signPost);
+
+  // Produtos empilhados sobre a base
+  const prodMats = COLORS.productColors.slice(0, 4).map(
+    (c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.75 })
+  );
+  let n = 0;
+  [-0.22, 0.22].forEach((x) => {
+    [-0.15, 0.15].forEach((z) => {
+      const item = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.18, 0.22), prodMats[n % 4]);
+      item.position.set(x, 0.84, z);
+      group.add(item);
+      n++;
+    });
+  });
+
+  group.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  return group;
+}
+
+// Palete de reposição com caixas empilhadas.
+function restockPallet() {
+  const group = new THREE.Group();
+  const woodMat = new THREE.MeshStandardMaterial({ color: 0x9a7b52, roughness: 0.9 });
+  const boxMat = new THREE.MeshStandardMaterial({ color: COLORS.obstacleWood, roughness: 0.85 });
+
+  // Estrado
+  [-0.32, 0, 0.32].forEach((z) => {
+    const plank = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.08, 0.16), woodMat);
+    plank.position.set(0, 0.04, z);
+    group.add(plank);
+  });
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.04, 0.8), woodMat);
+  deck.position.y = 0.1;
+  group.add(deck);
+
+  // Caixas empilhadas em duas fileiras
+  const layout = [
+    [-0.24, 0.26, -0.18], [0.24, 0.26, -0.18],
+    [-0.24, 0.26, 0.2], [0.24, 0.26, 0.2],
+    [-0.1, 0.58, 0], [0.26, 0.58, 0.05],
+  ];
+  layout.forEach(([x, y, z]) => {
+    const box = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.28, 0.36), boxMat);
+    box.position.set(x, y, z);
+    box.rotation.y = (Math.random() - 0.5) * 0.2;
+    group.add(box);
+  });
+
+  group.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  return group;
+}
+
 // --- Objetos típicos de via pública (ambiente externo) ---------------------
 
 // Lixeira pública sobre suporte.
@@ -332,6 +409,8 @@ const OBSTACLE_BUILDERS = {
   caixa: cardboardBox,
   cadeira: chair,
   carrinho: cart,
+  expositor: promoDisplay,
+  palete: restockPallet,
   banca: kiosk,
   lixeira: trashBin,
   bicicleta: bicycle,

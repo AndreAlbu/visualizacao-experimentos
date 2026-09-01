@@ -143,8 +143,15 @@ function typesForEnv(envId) {
 function defaultsFor(envId, scenarioId) {
   const scenario = SCENARIOS.find((s) => s.id === scenarioId);
   if (!scenario || !scenario.obstacleSlots) return [];
-  const available = new Set(typesForEnv(envId).map((t) => t.id));
-  return (scenario.defaultObstacles || []).filter((id) => available.has(id));
+  const availableTypes = typesForEnv(envId);
+  const available = new Set(availableTypes.map((t) => t.id));
+  const picked = (scenario.defaultObstacles || []).filter((id) => available.has(id));
+  // Rede de segurança: cenários que exigem bloqueio nunca ficam sem nada,
+  // mesmo que nenhum padrão do cenário exista no ambiente ativo.
+  if (!picked.length && scenario.requireObstacle && availableTypes.length) {
+    return [availableTypes[0].id];
+  }
+  return picked;
 }
 
 // Seleção de obstáculos memorizada por combinação de ambiente + cenário.

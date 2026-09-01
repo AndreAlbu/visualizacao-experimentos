@@ -413,7 +413,234 @@ function buildCorridor(group, scene) {
 }
 
 // ---------------------------------------------------------------------------
-// Ambiente 3: calçada (externo) — sem teto, com fachada de um lado e rua do outro
+// Ambiente 3: supermercado — corredor entre gôndolas carregadas de produtos
+// ---------------------------------------------------------------------------
+
+const GONDOLA_HEIGHT = 2.05;
+const GONDOLA_DEPTH = 0.5;
+
+// Placa de corredor suspensa, com o número da seção.
+function createAisleSignTexture(number) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = hex(COLORS.marketSign);
+  ctx.fillRect(0, 0, 256, 128);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 74px "Segoe UI", Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(String(number), 128, 62);
+  ctx.fillRect(28, 108, 200, 6);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+// Gôndola de um lado do corredor: painel de fundo, rodapé, prateleiras com
+// faixas de preço e produtos coloridos (via InstancedMesh).
+function buildGondolaSide(group, side, doorZs) {
+  const halfW = DIM.corridorWidth / 2;
+  const backX = side * halfW;
+  const centerX = side * (halfW - GONDOLA_DEPTH / 2);
+  const frontX = side * (halfW - GONDOLA_DEPTH);
+  const levels = [0.2, 0.62, 1.04, 1.46, 1.88]; // alturas das prateleiras
+
+  const metalMat = new THREE.MeshStandardMaterial({ color: COLORS.marketGondola, roughness: 0.55, metalness: 0.25 });
+  const backMat = new THREE.MeshStandardMaterial({ color: COLORS.marketGondolaBack, roughness: 0.8 });
+  const plinthMat = new THREE.MeshStandardMaterial({ color: COLORS.marketPlinth, roughness: 0.7 });
+  const stripMat = new THREE.MeshStandardMaterial({ color: COLORS.marketPriceStrip, roughness: 0.6 });
+
+  // Painel de fundo contínuo (fecha o corredor visualmente)
+  const back = new THREE.Mesh(
+    new THREE.PlaneGeometry(DIM.corridorLength, GONDOLA_HEIGHT),
+    backMat
+  );
+  back.position.set(backX - side * 0.01, GONDOLA_HEIGHT / 2, DIM.corridorLength / 2);
+  back.rotation.y = side === -1 ? Math.PI / 2 : -Math.PI / 2;
+  back.receiveShadow = true;
+  group.add(back);
+
+  const productGeo = new THREE.BoxGeometry(0.1, 1, 0.16);
+  const productMats = COLORS.productColors.map(
+    (c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.75 })
+  );
+  const products = [];
+
+  computeSegments(DIM.corridorLength, doorZs).forEach(([z0, z1]) => {
+    const segLen = z1 - z0;
+    const segCenterZ = (z0 + z1) / 2;
+
+    // Rodapé da gôndola
+    const plinth = new THREE.Mesh(new THREE.BoxGeometry(GONDOLA_DEPTH, 0.2, segLen), plinthMat);
+    plinth.position.set(centerX, 0.1, segCenterZ);
+    plinth.castShadow = true;
+    plinth.receiveShadow = true;
+    group.add(plinth);
+
+    // Prateleiras + faixa de preço na borda frontal
+    levels.forEach((y, i) => {
+      const shelf = new THREE.Mesh(new THREE.BoxGeometry(GONDOLA_DEPTH, 0.035, segLen), metalMat);
+      shelf.position.set(centerX, y, segCenterZ);
+      shelf.castShadow = true;
+      shelf.receiveShadow = true;
+      group.add(shelf);
+
+      if (i < levels.length - 1) {
+        const strip = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.05, segLen), stripMat);
+        strip.position.set(frontX + side * 0.01, y + 0.04, segCenterZ);
+        group.add(strip);
+      }
+    });
+
+    // Montantes verticais
+    const postCount = Math.max(2, Math.round(segLen / 1.4) + 1);
+    for (let i = 0; i < postCount; i++) {
+      const z = z0 + (segLen * i) / (postCount - 1);
+      const post = new THREE.Mesh(new THREE.BoxGeometry(GONDOLA_DEPTH, GONDOLA_HEIGHT, 0.04), metalMat);
+      post.position.set(centerX, GONDOLA_HEIGHT / 2, z);
+      group.add(post);
+    }
+
+    // Produtos: fileiras densas em cada prateleira
+    levels.slice(0, -1).forEach((y) => {
+      const count = Math.round(segLen / 0.12);
+      for (let i = 0; i < count; i++) {
+        const z = z0 + 0.08 + i * 0.12;
+        if (z > z1 - 0.08) continue;
+        products.push({
+          x: centerX + (Math.random() - 0.5) * 0.12,
+          y: y + 0.02,
+          z,
+          scaleY: 0.18 + Math.random() * 0.14,
+          mat: Math.floor(Math.random() * productMats.length),
+        });
+      }
+    });
+  });
+
+  // Um InstancedMesh por cor de produto
+  productMats.forEach((mat, matIndex) => {
+    const items = products.filter((p) => p.mat === matIndex);
+    if (!items.length) return;
+    const mesh = new THREE.InstancedMesh(productGeo, mat, items.length);
+    mesh.castShadow = true;
+    const dummy = new THREE.Object3D();
+    items.forEach((p, i) => {
+      // A geometria tem altura 1 e origem no centro: sobe metade da escala
+      dummy.position.set(p.x, p.y + (p.scaleY / 2), p.z);
+      dummy.scale.set(1, p.scaleY, 1);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(i, dummy.matrix);
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+    group.add(mesh);
+  });
+}
+
+// Placas de seção penduradas no teto ao longo do corredor.
+function buildAisleSigns(group) {
+  [6, 16, 26, 36].forEach((z, i) => {
+    const tex = createAisleSignTexture(i + 1);
+    const plate = new THREE.Mesh(
+      new THREE.BoxGeometry(1.1, 0.55, 0.04),
+      [
+        new THREE.MeshStandardMaterial({ color: COLORS.marketSign, roughness: 0.7 }),
+        new THREE.MeshStandardMaterial({ color: COLORS.marketSign, roughness: 0.7 }),
+        new THREE.MeshStandardMaterial({ color: COLORS.marketSign, roughness: 0.7 }),
+        new THREE.MeshStandardMaterial({ color: COLORS.marketSign, roughness: 0.7 }),
+        new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7 }),
+        new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7 }),
+      ]
+    );
+    const signY = 3.05;
+    const signTop = signY + 0.275;
+    plate.position.set(0, signY, z);
+    plate.castShadow = true;
+    group.add(plate);
+
+    // Hastes ligando o topo da placa ao teto
+    const rodLength = DIM.corridorHeight - signTop;
+    [-0.45, 0.45].forEach((x) => {
+      const rod = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.012, 0.012, rodLength, 6),
+        new THREE.MeshStandardMaterial({ color: COLORS.obstacleMetal, metalness: 0.6 })
+      );
+      rod.position.set(x, signTop + rodLength / 2, z);
+      group.add(rod);
+    });
+  });
+}
+
+function buildSupermarket(group, scene) {
+  scene.background = new THREE.Color(COLORS.marketCeiling);
+  scene.fog = new THREE.Fog(COLORS.marketCeiling, 26, 62);
+
+  // Piso claro e polido
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(DIM.corridorWidth, DIM.corridorLength),
+    new THREE.MeshStandardMaterial({
+      map: createGridTexture(COLORS.marketFloor, COLORS.marketFloorGrid, 5, DIM.corridorWidth / 1.2, DIM.corridorLength / 1.2),
+      roughness: 0.45,
+      metalness: 0.05,
+    })
+  );
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.set(0, 0, DIM.corridorLength / 2);
+  floor.receiveShadow = true;
+  group.add(floor);
+
+  buildGondolaSide(group, -1, DOORS_LEFT_Z);
+  buildGondolaSide(group, 1, DOORS_RIGHT_Z);
+
+  // Teto claro
+  const ceiling = new THREE.Mesh(
+    new THREE.PlaneGeometry(DIM.corridorWidth, DIM.corridorLength),
+    new THREE.MeshStandardMaterial({ color: COLORS.marketCeiling, roughness: 1 })
+  );
+  ceiling.rotation.x = Math.PI / 2;
+  ceiling.position.set(0, DIM.corridorHeight, DIM.corridorLength / 2);
+  ceiling.receiveShadow = true;
+  group.add(ceiling);
+
+  buildAisleSigns(group);
+
+  // Parede de fundo com ilha de refrigeradores
+  const endWall = new THREE.Mesh(
+    new THREE.PlaneGeometry(DIM.corridorWidth, DIM.corridorHeight),
+    new THREE.MeshStandardMaterial({ color: COLORS.marketGondolaBack, roughness: 0.9 })
+  );
+  endWall.position.set(0, DIM.corridorHeight / 2, DIM.corridorLength);
+  endWall.rotation.y = Math.PI;
+  group.add(endWall);
+
+  for (let i = 0; i < 4; i++) {
+    const cooler = new THREE.Mesh(
+      new THREE.BoxGeometry(1.3, 2.1, 0.5),
+      new THREE.MeshStandardMaterial({
+        color: COLORS.marketCooler, roughness: 0.25, metalness: 0.15,
+        emissive: 0x213038, emissiveIntensity: 0.25,
+      })
+    );
+    cooler.position.set(-2.1 + i * 1.4, 1.05, DIM.corridorLength - 0.3);
+    cooler.castShadow = true;
+    group.add(cooler);
+  }
+
+  // Iluminação: supermercados são bem mais claros que os demais ambientes
+  const shadowZ = CEILING_LIGHTS_Z[Math.floor(CEILING_LIGHTS_Z.length / 2)];
+  CEILING_LIGHTS_Z.forEach((z) => {
+    addCeilingLight(group, z, { width: DIM.corridorWidth * 0.85, castShadow: z === shadowZ });
+  });
+  group.add(new THREE.AmbientLight(0xffffff, 0.72));
+  group.add(new THREE.HemisphereLight(0xf4f6f7, 0x9aa0a4, 0.5));
+
+  return { ceiling };
+}
+
+// ---------------------------------------------------------------------------
+// Ambiente 4: calçada (externo) — sem teto, com fachada de um lado e rua do outro
 //
 // A calçada é mais larga que o corredor interno: a fachada fica no limite
 // esquerdo (-3) e o meio-fio é empurrado para +4,2, de modo que postes e
@@ -607,6 +834,7 @@ function buildSidewalk(group, scene) {
 const BUILDERS = {
   biblioteca: buildLibrary,
   corredor: buildCorridor,
+  supermercado: buildSupermarket,
   calcada: buildSidewalk,
 };
 
