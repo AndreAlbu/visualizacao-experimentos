@@ -155,6 +155,175 @@ function cart() {
   return group;
 }
 
+// --- Objetos típicos de via pública (ambiente externo) ---------------------
+
+// Lixeira pública sobre suporte.
+function trashBin() {
+  const group = new THREE.Group();
+  const bodyMat = new THREE.MeshStandardMaterial({ color: COLORS.binBody, roughness: 0.7 });
+  const metalMat = new THREE.MeshStandardMaterial({ color: COLORS.obstacleMetal, roughness: 0.5, metalness: 0.5 });
+
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.2, 0.7, 14), bodyMat);
+  body.position.y = 0.62;
+  group.add(body);
+
+  const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.27, 0.06, 14), metalMat);
+  lid.position.y = 1.0;
+  group.add(lid);
+
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.3, 8), metalMat);
+  post.position.y = 0.15;
+  group.add(post);
+
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.04, 10), metalMat);
+  base.position.y = 0.02;
+  group.add(base);
+
+  group.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  return group;
+}
+
+// Bicicleta estacionada (vista simplificada, de perfil).
+function bicycle() {
+  const group = new THREE.Group();
+  const frameMat = new THREE.MeshStandardMaterial({ color: COLORS.bikeFrame, roughness: 0.45, metalness: 0.4 });
+  const tireMat = new THREE.MeshStandardMaterial({ color: 0x22262a, roughness: 0.8 });
+
+  const wheelGeo = new THREE.TorusGeometry(0.33, 0.035, 8, 20);
+  [-0.52, 0.52].forEach((z) => {
+    const wheel = new THREE.Mesh(wheelGeo, tireMat);
+    wheel.rotation.y = Math.PI / 2;
+    wheel.position.set(0, 0.33, z);
+    group.add(wheel);
+  });
+
+  // Quadro: barras ligando os eixos ao selim/guidão
+  const barGeo = new THREE.CylinderGeometry(0.022, 0.022, 1, 8);
+  const bars = [
+    { pos: [0, 0.55, 0], rot: [Math.PI / 2, 0, 0], len: 0.95 },   // barra superior
+    { pos: [0, 0.36, 0.1], rot: [1.15, 0, 0], len: 0.72 },        // diagonal
+    { pos: [0, 0.5, 0.45], rot: [0.35, 0, 0], len: 0.5 },         // tubo do guidão
+    { pos: [0, 0.48, -0.4], rot: [-0.4, 0, 0], len: 0.42 },       // tubo do selim
+  ];
+  bars.forEach(({ pos, rot, len }) => {
+    const bar = new THREE.Mesh(barGeo, frameMat);
+    bar.scale.y = len;
+    bar.position.set(...pos);
+    bar.rotation.set(...rot);
+    group.add(bar);
+  });
+
+  const handlebar = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.42, 8), frameMat);
+  handlebar.rotation.z = Math.PI / 2;
+  handlebar.position.set(0, 0.7, 0.55);
+  group.add(handlebar);
+
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.05, 0.24), tireMat);
+  seat.position.set(0, 0.68, -0.48);
+  group.add(seat);
+
+  group.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  return group;
+}
+
+// Placa de sinalização/rua sobre poste.
+function streetSign() {
+  const group = new THREE.Group();
+  const postMat = new THREE.MeshStandardMaterial({ color: COLORS.signPost, roughness: 0.5, metalness: 0.5 });
+
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 2.1, 10), postMat);
+  post.position.y = 1.05;
+  group.add(post);
+
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.15, 0.06, 12), postMat);
+  base.position.y = 0.03;
+  group.add(base);
+
+  const plate = new THREE.Mesh(
+    new THREE.BoxGeometry(0.62, 0.3, 0.03),
+    new THREE.MeshStandardMaterial({ color: COLORS.signPlate, roughness: 0.5 })
+  );
+  plate.position.y = 1.95;
+  group.add(plate);
+
+  const stripe = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.54, 0.06),
+    new THREE.MeshStandardMaterial({ color: 0xf0efe9, roughness: 0.7 })
+  );
+  stripe.position.set(0, 1.95, 0.018);
+  group.add(stripe);
+
+  group.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  return group;
+}
+
+// Conjunto de cones de obra com uma barra de sinalização.
+function trafficCones() {
+  const group = new THREE.Group();
+  const coneMat = new THREE.MeshStandardMaterial({ color: COLORS.coneOrange, roughness: 0.7 });
+  const stripeMat = new THREE.MeshStandardMaterial({ color: 0xf0efe9, roughness: 0.7 });
+
+  [-0.45, 0.1, 0.55].forEach((x, i) => {
+    const cone = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.55, 12), coneMat);
+    body.position.y = 0.3;
+    const base = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.04, 0.3), coneMat);
+    base.position.y = 0.02;
+    const stripe = new THREE.Mesh(new THREE.CylinderGeometry(0.096, 0.115, 0.09, 12), stripeMat);
+    stripe.position.y = 0.32;
+    cone.add(body, base, stripe);
+    cone.position.set(x, 0, (i % 2) * 0.35 - 0.17);
+    group.add(cone);
+  });
+
+  group.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  return group;
+}
+
+// Banca / quiosque de rua: balcão com toldo.
+function kiosk() {
+  const group = new THREE.Group();
+  const structMat = new THREE.MeshStandardMaterial({ color: COLORS.obstacleMetal, roughness: 0.5, metalness: 0.4 });
+  const counterMat = new THREE.MeshStandardMaterial({ color: COLORS.obstacleWood, roughness: 0.8 });
+  const canvasMat = new THREE.MeshStandardMaterial({ color: COLORS.kioskCanvas, roughness: 0.85 });
+
+  // Balcão
+  const counter = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.06, 0.6), counterMat);
+  counter.position.y = 0.95;
+  group.add(counter);
+
+  const front = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.9, 0.05), counterMat);
+  front.position.set(0, 0.48, 0.28);
+  group.add(front);
+
+  // Postes e toldo
+  [-0.6, 0.6].forEach((x) => {
+    [-0.25, 0.25].forEach((z) => {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 2.1, 8), structMat);
+      post.position.set(x, 1.05, z);
+      group.add(post);
+    });
+  });
+
+  const canopy = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.06, 0.85), canvasMat);
+  canopy.position.y = 2.12;
+  canopy.rotation.x = 0.06;
+  group.add(canopy);
+
+  // Caixas de mercadoria sobre o balcão
+  [-0.35, 0.25].forEach((x, i) => {
+    const item = new THREE.Mesh(
+      new THREE.BoxGeometry(0.28, 0.16, 0.24),
+      new THREE.MeshStandardMaterial({ color: i ? 0x3b5a6b : 0x7a4b6b, roughness: 0.8 })
+    );
+    item.position.set(x, 1.06, -0.05);
+    group.add(item);
+  });
+
+  group.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  return group;
+}
+
 // Mapeia o id do tipo (ver OBSTACLE_TYPES em config.js) para o construtor.
 const OBSTACLE_BUILDERS = {
   mesa: studyDesk,
@@ -163,6 +332,11 @@ const OBSTACLE_BUILDERS = {
   caixa: cardboardBox,
   cadeira: chair,
   carrinho: cart,
+  banca: kiosk,
+  lixeira: trashBin,
+  bicicleta: bicycle,
+  placa: streetSign,
+  cones: trafficCones,
 };
 
 // Constrói os obstáculos de um cenário dentro do grupo dado.

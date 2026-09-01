@@ -52,6 +52,14 @@ export const COLORS = {
   grass: 0x7d9464,
   lampPost: 0x545a5f,
 
+  // Obstáculos de rua
+  binBody: 0x4d6b56,
+  bikeFrame: 0x2f5d6b,
+  signPost: 0x6f757a,
+  signPlate: 0x3f6b8a,
+  coneOrange: 0xd4642a,
+  kioskCanvas: 0xb9553f,
+
   participantBody: 0x37454f,
   participantHead: 0x55636d,
   participantAccent: 0x2e86ab,
@@ -101,14 +109,26 @@ export const ENVIRONMENTS = [
 ];
 
 // Tipos de obstáculo disponíveis no seletor (a ordem define a prioridade de
-// preenchimento das posições/slots do cenário).
+// preenchimento das posições/slots do cenário). `envs` limita cada tipo aos
+// ambientes onde ele faz sentido.
+const INDOOR = ['biblioteca', 'corredor'];
+const ALL_ENVS = ['biblioteca', 'corredor', 'calcada'];
+
 export const OBSTACLE_TYPES = [
-  { id: 'mesa', label: 'Mesa' },
-  { id: 'duas-pessoas', label: 'Duas pessoas' },
-  { id: 'pessoa', label: 'Uma pessoa' },
-  { id: 'caixa', label: 'Caixa' },
-  { id: 'cadeira', label: 'Cadeira' },
-  { id: 'carrinho', label: 'Carrinho' },
+  // Presentes em qualquer ambiente
+  { id: 'duas-pessoas', label: 'Duas pessoas', envs: ALL_ENVS },
+  { id: 'pessoa', label: 'Uma pessoa', envs: ALL_ENVS },
+  { id: 'caixa', label: 'Caixa', envs: ALL_ENVS },
+  // Mobiliário interno
+  { id: 'mesa', label: 'Mesa', envs: INDOOR },
+  { id: 'cadeira', label: 'Cadeira', envs: INDOOR },
+  { id: 'carrinho', label: 'Carrinho', envs: INDOOR },
+  // Objetos típicos de via pública
+  { id: 'banca', label: 'Banca / quiosque', envs: ['calcada'] },
+  { id: 'lixeira', label: 'Lixeira', envs: ['calcada'] },
+  { id: 'bicicleta', label: 'Bicicleta', envs: ['calcada'] },
+  { id: 'placa', label: 'Placa de rua', envs: ['calcada'] },
+  { id: 'cones', label: 'Cones de obra', envs: ['calcada'] },
 ];
 
 // Limites do controle de posição inicial do participante (metros).
@@ -138,7 +158,9 @@ export const SCENARIOS = [
     // os obstáculos se enfileiram AO LONGO do corredor (coluna em z), mantendo
     // a lateral livre para o participante passar com folga constante.
     obstacleSlots: [[0, 0], [0, 0.8], [0, -0.8], [0, 1.4], [0, -1.4]],
-    defaultObstacles: ['mesa'],
+    // Os padrões são filtrados pelos tipos disponíveis no ambiente ativo
+    // (ex.: 'mesa' em ambientes internos, 'banca' na calçada).
+    defaultObstacles: ['mesa', 'banca'],
     markers: [
       { id: 'START', pos: [0, 0, 2] },
       { id: 'T1', pos: [0, 0, 12] },
@@ -179,8 +201,8 @@ export const SCENARIOS = [
     risk: { center: [0, 0, 14], radius: 1.8 },
     // Slots distribuídos pela largura do corredor (bloqueio da passagem).
     obstacleSlots: [[-1.3, 0.1], [0.5, 0], [1.5, 0.1], [-0.5, 0.8], [1.0, 0.9]],
-    obstacleLabel: 'Obstáculo (corredor bloqueado)',
-    defaultObstacles: ['mesa', 'duas-pessoas', 'pessoa'],
+    obstacleLabel: 'Obstáculo (passagem bloqueada)',
+    defaultObstacles: ['mesa', 'banca', 'duas-pessoas', 'pessoa'],
     markers: [
       { id: 'START', pos: [0, 0, 2] },
       { id: 'T1', pos: [0, 0, 10] },

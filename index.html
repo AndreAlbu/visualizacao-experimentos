@@ -33,20 +33,21 @@
     <!-- Menu de cenários de navegação -->
     <aside id="scenario-panel" class="floating-panel scenario-panel"></aside>
 
-    <!-- Botões de visão -->
-    <div class="view-buttons">
-      <button id="btn-view-egocentric" class="view-btn">Visão egocêntrica</button>
-      <button id="btn-view-top" class="view-btn">Visão superior</button>
-      <button id="btn-labels" class="view-btn view-btn--toggle active" title="Mostrar/ocultar rótulos da cena">Rótulos</button>
-      <button id="btn-fov" class="view-btn active" title="Mostrar/ocultar o campo de visão da câmera">Campo de visão</button>
-    </div>
+    <!-- Barra inferior: visões à esquerda, controles de animação à direita -->
+    <div class="bottom-bar">
+      <div class="view-buttons">
+        <button id="btn-view-egocentric" class="view-btn">Visão egocêntrica</button>
+        <button id="btn-view-top" class="view-btn">Visão superior</button>
+        <button id="btn-labels" class="view-btn view-btn--toggle active" title="Mostrar/ocultar rótulos da cena">Rótulos</button>
+        <button id="btn-fov" class="view-btn active" title="Mostrar/ocultar o campo de visão da câmera">Campo de visão</button>
+      </div>
 
-    <!-- Controles de animação -->
-    <div class="animation-controls">
-      <button id="btn-play" class="anim-btn">▶ Reproduzir</button>
-      <button id="btn-reset" class="anim-btn">↻ Reiniciar</button>
-      <input id="progress-slider" type="range" min="0" max="1000" value="0" />
-      <span id="progress-label" class="progress-label">0%</span>
+      <div class="animation-controls">
+        <button id="btn-play" class="anim-btn">▶ Reproduzir</button>
+        <button id="btn-reset" class="anim-btn">↻ Reiniciar</button>
+        <input id="progress-slider" type="range" min="0" max="1000" value="0" />
+        <span id="progress-label" class="progress-label">0%</span>
+      </div>
     </div>
   </main>
 

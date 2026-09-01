@@ -42,7 +42,8 @@ controls.maxPolarAngle = Math.PI * 0.495;
 
 // --- Construção da cena -----------------------------------------------------
 const environmentManager = createEnvironmentManager(scene);
-const { ceiling } = environmentManager.load(ENVIRONMENTS[0].id);
+let currentEnvId = ENVIRONMENTS[0].id;
+const { ceiling } = environmentManager.load(currentEnvId);
 
 const participant = createParticipant();
 scene.add(participant.group);
@@ -87,9 +88,13 @@ ENVIRONMENTS.forEach((env) => {
 });
 envSelect.addEventListener('change', () => {
   // O ambiente é reconstruído do zero; o teto acompanhado pela visão
-  // superior muda junto (ambientes externos não têm teto).
-  const built = environmentManager.load(envSelect.value);
+  // superior muda junto (ambientes externos não têm teto). A lista de
+  // obstáculos também muda: cada ambiente tem seus objetos típicos.
+  currentEnvId = envSelect.value;
+  const built = environmentManager.load(currentEnvId);
   viewControls.setCeiling(built.ceiling);
+  renderObstacleChecks();
+  rebuildScenario();
 });
 scenarioPanel.appendChild(envSelect);
 
@@ -108,45 +113,77 @@ SCENARIOS.forEach((s, i) => {
   scenarioButtons.set(s.id, btn);
 });
 
-// Seleção de obstáculos, memorizada por cenário (inicia com o padrão de cada um)
-const obstacleSelections = new Map(
-  SCENARIOS.map((s) => [s.id, new Set(s.defaultObstacles || [])])
-);
 let currentScenarioId = SCENARIOS[0].id;
+
+// Tipos de obstáculo disponíveis no ambiente ativo.
+function typesForEnv(envId) {
+  return OBSTACLE_TYPES.filter((t) => t.envs.includes(envId));
+}
+
+// Obstáculos padrão do cenário que existem no ambiente dado (ex.: 'mesa' em
+// ambientes internos vira 'banca' na calçada).
+function defaultsFor(envId, scenarioId) {
+  const scenario = SCENARIOS.find((s) => s.id === scenarioId);
+  if (!scenario || !scenario.obstacleSlots) return [];
+  const available = new Set(typesForEnv(envId).map((t) => t.id));
+  return (scenario.defaultObstacles || []).filter((id) => available.has(id));
+}
+
+// Seleção de obstáculos memorizada por combinação de ambiente + cenário.
+const obstacleSelections = new Map();
+function getSelection(envId = currentEnvId, scenarioId = currentScenarioId) {
+  const key = `${envId}::${scenarioId}`;
+  if (!obstacleSelections.has(key)) {
+    obstacleSelections.set(key, new Set(defaultsFor(envId, scenarioId)));
+  }
+  return obstacleSelections.get(key);
+}
 
 const obstacleTitle = document.createElement('div');
 obstacleTitle.className = 'panel-subtitle';
 obstacleTitle.textContent = 'Obstáculos do cenário';
 scenarioPanel.appendChild(obstacleTitle);
 
-const obstacleChecks = new Map();
-OBSTACLE_TYPES.forEach((type) => {
-  const row = document.createElement('label');
-  row.className = 'obstacle-check';
-  const input = document.createElement('input');
-  input.type = 'checkbox';
-  input.addEventListener('change', () => {
-    const scenario = SCENARIOS.find((s) => s.id === currentScenarioId);
-    const selection = obstacleSelections.get(currentScenarioId);
-    if (input.checked) {
-      selection.add(type.id);
-    } else {
-      // Cenário de parada exige bloqueio: não permite desmarcar o último obstáculo.
-      if (scenario.requireObstacle && selection.size === 1 && selection.has(type.id)) {
-        input.checked = true;
-        return;
+const obstacleList = document.createElement('div');
+scenarioPanel.appendChild(obstacleList);
+
+// Reconstrói a lista de checkboxes para os tipos válidos no ambiente ativo.
+function renderObstacleChecks() {
+  const scenario = SCENARIOS.find((s) => s.id === currentScenarioId);
+  const selection = getSelection();
+  const enabled = Boolean(scenario && scenario.obstacleSlots);
+  obstacleList.innerHTML = '';
+
+  typesForEnv(currentEnvId).forEach((type) => {
+    const row = document.createElement('label');
+    row.className = 'obstacle-check';
+    if (!enabled) row.classList.add('disabled');
+
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.checked = selection.has(type.id);
+    input.disabled = !enabled;
+    input.addEventListener('change', () => {
+      if (input.checked) {
+        selection.add(type.id);
+      } else {
+        // Cenário de parada exige bloqueio: não desmarca o último obstáculo.
+        if (scenario.requireObstacle && selection.size === 1 && selection.has(type.id)) {
+          input.checked = true;
+          return;
+        }
+        selection.delete(type.id);
       }
-      selection.delete(type.id);
-    }
-    rebuildScenario();
+      rebuildScenario();
+    });
+
+    const text = document.createElement('span');
+    text.textContent = type.label;
+    row.appendChild(input);
+    row.appendChild(text);
+    obstacleList.appendChild(row);
   });
-  const text = document.createElement('span');
-  text.textContent = type.label;
-  row.appendChild(input);
-  row.appendChild(text);
-  scenarioPanel.appendChild(row);
-  obstacleChecks.set(type.id, input);
-});
+}
 
 // Controles de posição inicial do participante
 const startPos = { ...START_DEFAULT };
@@ -183,25 +220,14 @@ function makeStartSlider(labelText, axis, [min, max]) {
 makeStartSlider('Lateral', 'x', START_LIMITS.x);
 makeStartSlider('Distância', 'z', START_LIMITS.z);
 
-// Sincroniza os checkboxes com a seleção do cenário ativo; cenários sem
-// slots de obstáculo (caminhada livre) têm o seletor desabilitado.
-function syncObstacleChecks(scenario) {
-  const selection = obstacleSelections.get(scenario.id);
-  const enabled = Boolean(scenario.obstacleSlots);
-  obstacleChecks.forEach((input, typeId) => {
-    input.checked = selection.has(typeId);
-    input.disabled = !enabled;
-    input.parentElement.classList.toggle('disabled', !enabled);
-  });
-}
-
 // Reconstrói o cenário ativo com as opções atuais (obstáculos + posição inicial).
 function rebuildScenario() {
   const scenario = SCENARIOS.find((s) => s.id === currentScenarioId);
   if (!scenario) return;
-  const selection = obstacleSelections.get(scenario.id);
-  // A ordem de OBSTACLE_TYPES define a prioridade de preenchimento dos slots.
-  const types = OBSTACLE_TYPES.filter((t) => selection.has(t.id)).map((t) => t.id);
+  const selection = getSelection();
+  // A ordem de OBSTACLE_TYPES define a prioridade de preenchimento dos slots;
+  // só entram tipos válidos no ambiente ativo.
+  const types = typesForEnv(currentEnvId).filter((t) => selection.has(t.id)).map((t) => t.id);
   const { curve, riskZone } = scenarioManager.load(scenario, {
     types,
     start: startPos,
@@ -220,11 +246,11 @@ function selectScenario(id) {
   currentScenarioId = id;
   // Ao entrar num cenário com o seletor vazio, reaplica os obstáculos padrão
   // dele — assim sempre "já vem algo marcado" ao escolher o cenário.
-  const selection = obstacleSelections.get(id);
+  const selection = getSelection();
   if (scenario.obstacleSlots && selection.size === 0) {
-    (scenario.defaultObstacles || []).forEach((t) => selection.add(t));
+    defaultsFor(currentEnvId, id).forEach((t) => selection.add(t));
   }
-  syncObstacleChecks(scenario);
+  renderObstacleChecks();
   rebuildScenario();
   scenarioButtons.forEach((btn, key) => btn.classList.toggle('active', key === id));
 }

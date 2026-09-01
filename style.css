@@ -8,6 +8,7 @@
   --accent-red: #c1440e;
   --accent-green: #2f9e44;
   --font: "Segoe UI", "Helvetica Neue", Arial, "Inter", sans-serif;
+  --panel-width: 250px;
 }
 
 * { box-sizing: border-box; }
@@ -104,10 +105,14 @@ html, body {
 .scenario-panel {
   top: 14px;
   right: 14px;
-  width: 250px;
+  width: var(--panel-width);
   display: flex;
   flex-direction: column;
   gap: 6px;
+  /* Se a lista crescer mais que a área visível, o painel rola em vez de
+     transbordar por cima da barra inferior. */
+  max-height: calc(100% - 28px);
+  overflow-y: auto;
 }
 .scenario-btn {
   background: #fff;
@@ -179,13 +184,26 @@ html, body {
   accent-color: var(--accent-blue);
 }
 
-/* ---------- Botões de visão ---------- */
-.view-buttons {
+/* ---------- Barra inferior ---------- */
+/* Ocupa apenas a faixa à esquerda do painel lateral, para os controles de
+   animação nunca ficarem por cima dele. */
+.bottom-bar {
   position: absolute;
   bottom: 14px;
   left: 14px;
+  right: calc(var(--panel-width) + 28px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* ---------- Botões de visão ---------- */
+.view-buttons {
   display: flex;
   gap: 6px;
+  flex-wrap: wrap;
 }
 .view-btn {
   background: var(--panel-bg);
@@ -208,9 +226,6 @@ html, body {
 
 /* ---------- Controles de animação ---------- */
 .animation-controls {
-  position: absolute;
-  bottom: 14px;
-  right: 14px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -262,6 +277,10 @@ html, body {
   color: #1b4f68;
 }
 
-@media (max-width: 860px) {
+@media (max-width: 980px) {
+  :root { --panel-width: 200px; }
   .legend-panel { width: 150px; font-size: 11px; }
+  /* Em telas estreitas os dois blocos empilham em vez de disputar a largura */
+  .bottom-bar { flex-direction: column; align-items: flex-start; gap: 8px; }
+  #progress-slider { width: 100px; }
 }
