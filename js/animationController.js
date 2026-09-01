@@ -24,6 +24,7 @@ export function setupAnimationController({ participant, ui }) {
   let progress = 0;
   let playing = false;
   let walkClock = 0;
+  let elapsed = 0; // tempo de gravação decorrido, em segundos
 
   // Velocidade instantânea em função da distância ao centro da zona de risco.
   function speedAt(point) {
@@ -33,6 +34,20 @@ export function setupAnimationController({ participant, ui }) {
     const t = 1 - d / SLOW_RADIUS; // 0 (borda) .. 1 (centro)
     const s = t * t * (3 - 2 * t); // smoothstep
     return baseSpeed + (SLOW_SPEED - baseSpeed) * s;
+  }
+
+  // Tempo de gravação correspondente a um progresso, integrando o perfil de
+  // velocidade ao longo da curva. Usado ao arrastar a barra, para o relógio
+  // do HUD continuar coerente com a reprodução normal.
+  function timeAt(p) {
+    if (!curve || p <= 0) return 0;
+    const steps = 120;
+    const ds = (curveLength * p) / steps;
+    let t = 0;
+    for (let i = 0; i < steps; i++) {
+      t += ds / speedAt(curve.getPointAt(((i + 0.5) / steps) * p));
+    }
+    return t;
   }
 
   function setProgress(p) {
@@ -82,6 +97,7 @@ export function setupAnimationController({ participant, ui }) {
     const speed = speedAt(point);
 
     // Avanço proporcional à velocidade instantânea (m/s -> fração da curva)
+    elapsed += delta;
     setProgress(progress + (speed * delta) / curveLength);
 
     // A cadência da passada acompanha a velocidade: passos mais lentos
@@ -110,19 +126,24 @@ export function setupAnimationController({ participant, ui }) {
     stopAtEnd = Boolean(stop);
     playing = false;
     walkClock = 0;
+    elapsed = 0;
     ui.playBtn.textContent = '▶ Reproduzir';
     walkingPose();
     setProgress(0);
   }
 
   ui.playBtn.addEventListener('click', () => {
-    if (progress >= 1) setProgress(0);
+    if (progress >= 1) {
+      setProgress(0);
+      elapsed = 0;
+    }
     playing = !playing;
     ui.playBtn.textContent = playing ? '⏸ Pausar' : '▶ Reproduzir';
   });
   ui.resetBtn.addEventListener('click', () => {
     playing = false;
     walkClock = 0;
+    elapsed = 0;
     ui.playBtn.textContent = '▶ Reproduzir';
     walkingPose();
     setProgress(0);
@@ -131,7 +152,12 @@ export function setupAnimationController({ participant, ui }) {
     playing = false;
     ui.playBtn.textContent = '▶ Reproduzir';
     setProgress(Number(e.target.value) / 1000);
+    elapsed = timeAt(progress);
   });
 
-  return { update, setProgress, setScenario, isPlaying: () => playing };
+  return {
+    update, setProgress, setScenario,
+    isPlaying: () => playing,
+    getElapsed: () => elapsed,
+  };
 }

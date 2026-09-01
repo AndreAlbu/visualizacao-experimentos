@@ -9,6 +9,7 @@ import { createScenarioManager } from './scenarioManager.js';
 import { buildLegend } from './legend.js';
 import { setupViewControls } from './viewControls.js';
 import { setupAnimationController } from './animationController.js';
+import { exportSceneImage } from './exportImage.js';
 
 // --- Setup básico de cena, câmeras e renderizadores -------------------------
 const container = document.getElementById('scene-container');
@@ -18,7 +19,8 @@ scene.background = new THREE.Color(COLORS.wall);
 
 const camera = new THREE.PerspectiveCamera(48, container.clientWidth / container.clientHeight, 0.1, 200);
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+// preserveDrawingBuffer permite ler o canvas na exportação em PNG
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(container.clientWidth, container.clientHeight);
 renderer.shadowMap.enabled = true;
@@ -57,7 +59,23 @@ const viewButtons = {
   egocentric: document.getElementById('btn-view-egocentric'),
   top: document.getElementById('btn-view-top'),
 };
-const viewControls = setupViewControls({ camera, controls, buttons: viewButtons, participantGroup: participant.group, ceiling });
+// HUD de gravação, visível apenas na visão egocêntrica
+const recHud = document.getElementById('rec-hud');
+const recTime = document.getElementById('rec-time');
+const recFrame = document.getElementById('rec-frame');
+let hudVisible = false;
+
+const viewControls = setupViewControls({
+  camera,
+  controls,
+  buttons: viewButtons,
+  participantGroup: participant.group,
+  ceiling,
+  onViewChange: (name) => {
+    hudVisible = name === 'egocentric';
+    recHud.classList.toggle('rec-hud--on', hudVisible);
+  },
+});
 
 const animationApi = setupAnimationController({
   participant,
@@ -268,6 +286,45 @@ labelsBtn.addEventListener('click', () => {
   labelsBtn.classList.toggle('active', !visible);
 });
 
+// --- Exportação da figura em alta resolução -----------------------------------
+const exportBtn = document.getElementById('btn-export');
+const EXPORT_SCALE = 3; // 3x a resolução de tela
+
+exportBtn.addEventListener('click', async () => {
+  const original = exportBtn.textContent;
+  exportBtn.disabled = true;
+  exportBtn.textContent = 'Exportando…';
+  try {
+    await exportSceneImage({
+      renderer,
+      scene,
+      camera,
+      labelRenderer,
+      container,
+      scale: EXPORT_SCALE,
+      filename: `experimento-${currentEnvId}-${currentScenarioId}.png`,
+    });
+  } finally {
+    exportBtn.disabled = false;
+    exportBtn.textContent = original;
+  }
+});
+
+// --- HUD de gravação ----------------------------------------------------------
+const HUD_FPS = 30;
+
+function updateRecHud() {
+  const elapsed = animationApi.getElapsed();
+  const centis = Math.floor(elapsed * 100);
+  const mm = String(Math.floor(centis / 6000)).padStart(2, '0');
+  const ss = String(Math.floor(centis / 100) % 60).padStart(2, '0');
+  const cc = String(centis % 100).padStart(2, '0');
+  recTime.textContent = `${mm}:${ss}.${cc}`;
+  recFrame.textContent = `frame ${String(Math.floor(elapsed * HUD_FPS)).padStart(5, '0')}`;
+  // O ponto vermelho só pisca enquanto a caminhada está sendo reproduzida
+  recHud.classList.toggle('rec-hud--rec', animationApi.isPlaying());
+}
+
 // --- Liga/desliga o cone de campo de visão da câmera ---------------------------
 const fovBtn = document.getElementById('btn-fov');
 const fovCone = participant.group.getObjectByName('fov-cone');
@@ -299,6 +356,7 @@ function animate() {
   animationApi.update(delta);
   viewControls.update(delta);
   controls.update();
+  if (hudVisible) updateRecHud();
 
   renderer.render(scene, camera);
   labelRenderer.render(scene, camera);

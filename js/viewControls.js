@@ -45,7 +45,9 @@ const FOLLOW_VIEWS = new Set(['egocentric']);
 // câmera segue o participante continuamente e arrastar o mouse gira o olhar
 // em 360° (yaw) e para cima/baixo (pitch) a partir do ponto de vista do
 // operador.
-export function setupViewControls({ camera, controls, buttons, participantGroup, ceiling = null }) {
+export function setupViewControls({
+  camera, controls, buttons, participantGroup, ceiling = null, onViewChange = () => {},
+}) {
   // Offsets de olhar da visão egocêntrica, controlados pelo arraste do mouse.
   const egoLook = { yaw: 0, pitch: 0 };
   const VIEWS = presets(participantGroup, egoLook);
@@ -82,6 +84,8 @@ export function setupViewControls({ camera, controls, buttons, participantGroup,
 
     Object.values(buttons).forEach((b) => b.classList.remove('active'));
     buttons[name] && buttons[name].classList.add('active');
+
+    onViewChange(name);
   }
 
   Object.entries(buttons).forEach(([name, btn]) => {
