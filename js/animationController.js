@@ -20,6 +20,7 @@ export function setupAnimationController({ participant, ui }) {
   let riskZone = null;
   let baseSpeed = 1.15;
   let stopAtEnd = false;
+  let yawFollow = 1; // 1 = corpo segue a tangente; < 1 = mantém-se de frente
 
   let progress = 0;
   let playing = false;
@@ -59,8 +60,12 @@ export function setupAnimationController({ participant, ui }) {
     participant.group.position.set(point.x, 0, point.z);
     if (tangent.lengthSq() > 1e-6) {
       tangent.normalize();
-      participant.group.rotation.y = Math.atan2(tangent.x, tangent.z);
-      participant.group.userData.facing = tangent.clone();
+      // `yawFollow` < 1 faz o corpo quase não girar: o participante desliza
+      // para o lado com o tronco (e a câmera) apontados para a frente, em vez
+      // de caminhar na diagonal.
+      const yaw = Math.atan2(tangent.x, tangent.z) * yawFollow;
+      participant.group.rotation.y = yaw;
+      participant.group.userData.facing = tangent.set(Math.sin(yaw), 0, Math.cos(yaw)).clone();
     }
 
     // Destaca a zona de risco quando o participante está próximo dela
@@ -118,12 +123,13 @@ export function setupAnimationController({ participant, ui }) {
   }
 
   // Troca o cenário ativo: nova curva, zona de risco e velocidade; reinicia tudo.
-  function setScenario({ curve: newCurve, riskZone: newRiskZone, speed, stop }) {
+  function setScenario({ curve: newCurve, riskZone: newRiskZone, speed, stop, yawFollow: newYawFollow }) {
     curve = newCurve;
     curveLength = newCurve.getLength();
     riskZone = newRiskZone;
     baseSpeed = speed;
     stopAtEnd = Boolean(stop);
+    yawFollow = newYawFollow === undefined ? 1 : newYawFollow;
     playing = false;
     walkClock = 0;
     elapsed = 0;

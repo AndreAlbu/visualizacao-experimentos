@@ -188,6 +188,13 @@ html, body {
   width: 100%;
   accent-color: var(--accent-blue);
 }
+.detour-info {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--ink-soft);
+  font-style: italic;
+}
+
 .start-slider.disabled { opacity: 0.45; }
 .start-slider.disabled input { cursor: default; }
 
