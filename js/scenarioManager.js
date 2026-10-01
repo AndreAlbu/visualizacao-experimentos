@@ -38,6 +38,19 @@ function detourSteps(types) {
   return Math.min(Math.max(steps, MIN_DETOUR_STEPS), MAX_DETOUR_STEPS);
 }
 
+// Posição lateral da trajetória num dado z (interpolação entre os pontos).
+function xAtZ(path, z) {
+  for (let i = 1; i < path.length; i++) {
+    const [x0, , z0] = path[i - 1];
+    const [x1, , z1] = path[i];
+    if ((z >= z0 && z <= z1) || (z >= z1 && z <= z0)) {
+      const t = z1 === z0 ? 0 : (z - z0) / (z1 - z0);
+      return x0 + (x1 - x0) * t;
+    }
+  }
+  return path[path.length - 1][0];
+}
+
 // Gera a trajetória do desvio. O deslocamento lateral vale um número inteiro
 // de passos e é distribuído por um trecho longo, com perfil suave (smoothstep):
 // o participante sai e chega alinhado ao corredor, sem guinada, mantendo a
@@ -79,10 +92,16 @@ function buildDetourGeometry(scenario, { laneX, startZ, types }) {
   // 3) segue reto na nova faixa
   pushStraight(targetX, reachZ, endZ, true);
 
+  // T1 e T2 são os instantes de referência do protocolo: ficam a uma distância
+  // fixa ANTES e DEPOIS do obstáculo, independentemente de onde o deslizamento
+  // lateral começa. Ficam sobre a trajetória, acompanhando o x dela naquele z.
+  const gap = scenario.detour.markerGap === undefined ? 1.5 : scenario.detour.markerGap;
+  const t1Z = obstacleZ - gap;
+  const t2Z = obstacleZ + gap;
   const markers = [
     { id: 'START', pos: [laneX, 0, startZ] },
-    { id: 'T1', pos: [laneX, 0, shiftStartZ] },
-    { id: 'T2', pos: [targetX, 0, reachZ] },
+    { id: 'T1', pos: [xAtZ(path, t1Z), 0, t1Z] },
+    { id: 'T2', pos: [xAtZ(path, t2Z), 0, t2Z] },
     { id: 'END', pos: [targetX, 0, endZ] },
   ];
 
