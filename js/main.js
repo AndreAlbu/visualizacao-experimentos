@@ -186,11 +186,6 @@ scenarioPanel.appendChild(obstacleTitle);
 const obstacleList = document.createElement('div');
 scenarioPanel.appendChild(obstacleList);
 
-// Resumo do desvio calculado a partir do tamanho do obstáculo
-const detourInfoEl = document.createElement('div');
-detourInfoEl.className = 'detour-info';
-scenarioPanel.appendChild(detourInfoEl);
-
 // Reconstrói a lista de checkboxes para os tipos válidos no ambiente ativo.
 function renderObstacleChecks() {
   const scenario = SCENARIOS.find((s) => s.id === currentScenarioId);
@@ -273,24 +268,15 @@ function rebuildScenario() {
   // A ordem de OBSTACLE_TYPES define a prioridade de preenchimento dos slots;
   // só entram tipos válidos no ambiente ativo.
   const types = typesForEnv(currentEnvId).filter((t) => selection.has(t.id)).map((t) => t.id);
-  const { curve, riskZone, detourInfo } = scenarioManager.load(scenario, {
+  const { curve, riskZone } = scenarioManager.load(scenario, {
     types,
     start: startPos,
   });
-  if (detourInfo) {
-    const passos = detourInfo.steps === 1 ? 'passo' : 'passos';
-    detourInfoEl.textContent =
-      `Desvio: ${detourInfo.steps} ${passos} (${detourInfo.lateral.toFixed(2).replace('.', ',')} m)`;
-    detourInfoEl.style.display = '';
-  } else {
-    detourInfoEl.style.display = 'none';
-  }
   animationApi.setScenario({
     curve,
     riskZone,
     speed: scenario.speed,
     stop: scenario.stop,
-    yawFollow: scenario.yawFollow,
   });
 }
 

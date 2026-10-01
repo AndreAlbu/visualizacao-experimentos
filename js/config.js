@@ -115,26 +115,6 @@ export const WALK_SPEED = 1.15; // m/s (ritmo normal de caminhada)
 export const SLOW_SPEED = 0.45; // m/s (aproximação cautelosa do obstáculo)
 export const SLOW_RADIUS = 4.5; // m (raio de influência da desaceleração)
 
-// ---------------------------------------------------------------------------
-// Geometria do desvio.
-// No experimento real o participante não "joga" o corpo para a parede: ele dá
-// alguns passos laterais, quantos bastarem para o tamanho do objeto, e o faz
-// de forma antecipada e gradual — assim a imagem da câmera continua apontada
-// para a frente, sem guinada brusca.
-// ---------------------------------------------------------------------------
-export const STEP_LATERAL = 0.45;   // m de deslocamento por passo lateral
-export const MIN_DETOUR_STEPS = 2;  // "basicamente uns dois passos para o lado"
-export const MAX_DETOUR_STEPS = 4;  // objetos maiores exigem mais passos
-export const BODY_HALF_WIDTH = 0.22; // meia largura do participante
-export const DETOUR_MARGIN = 0.12;   // folga mínima ao passar pelo objeto
-// Quanto o corpo acompanha a direção da trajetória durante o desvio. Abaixo de
-// 1, o participante mantém tronco e câmera mais apontados para a frente do
-// corredor em vez de girar e caminhar na diagonal — é o que mantém o
-// enquadramento estável. Curvas de verdade (como as do supermercado complexo)
-// seguem a tangente integralmente.
-export const DETOUR_YAW_FOLLOW = 0.35;
-export const MAX_LATERAL_ABS = 2.1;  // limite lateral útil do corredor
-
 // Ambientes disponíveis no seletor. O layout do experimento (largura útil,
 // trajetórias e obstáculos) é o mesmo em todos; muda o entorno.
 export const ENVIRONMENTS = [
@@ -159,22 +139,22 @@ const LINEAR_ENVS = ['biblioteca', 'corredor', 'supermercado', 'calcada'];
 
 export const OBSTACLE_TYPES = [
   // Presentes em qualquer ambiente
-  { id: 'duas-pessoas', label: 'Duas pessoas', envs: ALL_ENVS, halfWidth: 0.65 },
-  { id: 'pessoa', label: 'Uma pessoa', envs: ALL_ENVS, halfWidth: 0.22 },
-  { id: 'caixa', label: 'Caixa', envs: ALL_ENVS, halfWidth: 0.34 },
+  { id: 'duas-pessoas', label: 'Duas pessoas', envs: ALL_ENVS },
+  { id: 'pessoa', label: 'Uma pessoa', envs: ALL_ENVS },
+  { id: 'caixa', label: 'Caixa', envs: ALL_ENVS },
   // Mobiliário interno
-  { id: 'mesa', label: 'Mesa', envs: STUDY, halfWidth: 0.52 },
-  { id: 'cadeira', label: 'Cadeira', envs: STUDY, halfWidth: 0.26 },
-  { id: 'carrinho', label: 'Carrinho', envs: ['biblioteca', 'corredor', ...MARKETS], halfWidth: 0.34 },
+  { id: 'mesa', label: 'Mesa', envs: STUDY },
+  { id: 'cadeira', label: 'Cadeira', envs: STUDY },
+  { id: 'carrinho', label: 'Carrinho', envs: ['biblioteca', 'corredor', ...MARKETS] },
   // Típicos de supermercado
-  { id: 'expositor', label: 'Expositor promocional', envs: MARKETS, halfWidth: 0.48 },
-  { id: 'palete', label: 'Palete de reposição', envs: MARKETS, halfWidth: 0.52 },
+  { id: 'expositor', label: 'Expositor promocional', envs: MARKETS },
+  { id: 'palete', label: 'Palete de reposição', envs: MARKETS },
   // Objetos típicos de via pública
-  { id: 'banca', label: 'Banca / quiosque', envs: ['calcada'], halfWidth: 0.76 },
-  { id: 'lixeira', label: 'Lixeira', envs: ['calcada'], halfWidth: 0.28 },
-  { id: 'bicicleta', label: 'Bicicleta', envs: ['calcada'], halfWidth: 0.45 },
-  { id: 'placa', label: 'Placa de rua', envs: ['calcada'], halfWidth: 0.32 },
-  { id: 'cones', label: 'Cones de obra', envs: ['calcada'], halfWidth: 0.62 },
+  { id: 'banca', label: 'Banca / quiosque', envs: ['calcada'] },
+  { id: 'lixeira', label: 'Lixeira', envs: ['calcada'] },
+  { id: 'bicicleta', label: 'Bicicleta', envs: ['calcada'] },
+  { id: 'placa', label: 'Placa de rua', envs: ['calcada'] },
+  { id: 'cones', label: 'Cones de obra', envs: ['calcada'] },
 ];
 
 // Limites do controle de posição inicial do participante (metros).
@@ -191,12 +171,15 @@ export const SCENARIOS = [
     label: 'Desvio à esquerda',
     requireObstacle: true, // não faz sentido desviar de nada: sempre ao menos 1 obstáculo
     speed: WALK_SPEED,
-    // A trajetória é gerada a partir daqui: a quantidade de passos laterais
-    // sai do tamanho do obstáculo selecionado, e a transição é espalhada por
-    // vários metros. `side` +1 = esquerda. Depois do desvio segue reto na
-    // nova faixa (não retorna ao centro), como no protocolo real.
-    detour: { side: 1, startZ: 2, obstacleZ: 15, endZ: 23 },
-    yawFollow: DETOUR_YAW_FOLLOW, // desliza para o lado sem girar o corpo
+    // Como no protocolo real: caminha reto, desvia do obstáculo e SEGUE RETO
+    // na nova faixa (não retorna ao centro).
+    path: [
+      [0, 0, 2], [0, 0, 8], [0, 0, 12],
+      [1.5, 0, 13.4], [1.5, 0, 16.6],
+      [1.5, 0, 18], [1.5, 0, 23],
+    ],
+    ghost: [[0, 0, 12], [0, 0, 19.5]], // curso original que atravessaria a mesa
+    detourZ: [12.3, 16.8], // faixa da trajetória destacada como desvio
     risk: { center: [0, 0, 15], radius: 1.8 },
     // Slots (offsets x/z relativos ao centro da zona de risco) preenchidos
     // pelos tipos de obstáculo selecionados no painel. Nos cenários de desvio
@@ -206,6 +189,12 @@ export const SCENARIOS = [
     // Os padrões são filtrados pelos tipos disponíveis no ambiente ativo
     // (ex.: 'mesa' em ambientes internos, 'banca' na calçada).
     defaultObstacles: ['mesa', 'expositor', 'banca'],
+    markers: [
+      { id: 'START', pos: [0, 0, 2] },
+      { id: 'T1', pos: [0, 0, 12] },
+      { id: 'T2', pos: [1.5, 0, 18] },
+      { id: 'END', pos: [1.5, 0, 23] },
+    ],
   },
   {
     id: 'desvio-direita',
@@ -213,11 +202,22 @@ export const SCENARIOS = [
     label: 'Desvio à direita',
     requireObstacle: true, // não faz sentido desviar de nada: sempre ao menos 1 obstáculo
     speed: WALK_SPEED,
-    detour: { side: -1, startZ: 2, obstacleZ: 15, endZ: 23 },
-    yawFollow: DETOUR_YAW_FOLLOW,
+    path: [
+      [0, 0, 2], [0, 0, 8], [0, 0, 12],
+      [-1.5, 0, 13.4], [-1.5, 0, 16.6],
+      [-1.5, 0, 18], [-1.5, 0, 23],
+    ],
+    ghost: [[0, 0, 12], [0, 0, 19.5]],
+    detourZ: [12.3, 16.8],
     risk: { center: [0, 0, 15], radius: 1.8 },
     obstacleSlots: [[0, 0], [0, 0.8], [0, -0.8], [0, 1.4], [0, -1.4]],
     defaultObstacles: ['duas-pessoas'],
+    markers: [
+      { id: 'START', pos: [0, 0, 2] },
+      { id: 'T1', pos: [0, 0, 12] },
+      { id: 'T2', pos: [-1.5, 0, 18] },
+      { id: 'END', pos: [-1.5, 0, 23] },
+    ],
   },
   {
     id: 'aproximacao-parada',
