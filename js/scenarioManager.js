@@ -4,7 +4,7 @@ import { buildRiskZone } from './riskZone.js';
 import { buildScenarioObstacles } from './obstacles.js';
 import {
   OBSTACLE_TYPES, STEP_LATERAL, MIN_DETOUR_STEPS, MAX_DETOUR_STEPS,
-  BODY_HALF_WIDTH, DETOUR_MARGIN, MAX_DETOUR_YAW_DEG, MAX_LATERAL_ABS,
+  BODY_HALF_WIDTH, DETOUR_MARGIN, MAX_LATERAL_ABS,
 } from './config.js';
 
 // Remove um grupo da cena liberando geometrias/materiais e os elementos HTML
@@ -38,38 +38,24 @@ function detourSteps(types) {
   return Math.min(Math.max(steps, MIN_DETOUR_STEPS), MAX_DETOUR_STEPS);
 }
 
-// Posição lateral da trajetória num dado z (interpolação entre os pontos).
-function xAtZ(path, z) {
-  for (let i = 1; i < path.length; i++) {
-    const [x0, , z0] = path[i - 1];
-    const [x1, , z1] = path[i];
-    if ((z >= z0 && z <= z1) || (z >= z1 && z <= z0)) {
-      const t = z1 === z0 ? 0 : (z - z0) / (z1 - z0);
-      return x0 + (x1 - x0) * t;
-    }
-  }
-  return path[path.length - 1][0];
-}
-
-// Gera a trajetória do desvio. O deslocamento lateral vale um número inteiro
-// de passos e é distribuído por um trecho longo, com perfil suave (smoothstep):
-// o participante sai e chega alinhado ao corredor, sem guinada, mantendo a
-// câmera apontada para a frente durante toda a manobra.
+// Gera a trajetória do desvio seguindo a geometria do protocolo:
+//
+//   START --- 5 m --- T1 --- 1,5 m --- obstáculo --- 1,5 m --- T2 --- END
+//
+// O desvio começa em T1 ("begin the detour just before the obstacle") e se
+// completa em T2. O que varia é a AMPLITUDE: um número inteiro de passos
+// laterais, conforme o tamanho do objeto. A transição usa perfil smoothstep,
+// que sai e chega alinhada ao corredor, sem quina nas pontas.
 function buildDetourGeometry(scenario, { laneX, startZ, types }) {
   const { side, obstacleZ, endZ } = scenario.detour;
+  const gap = scenario.detour.markerGap === undefined ? 1.5 : scenario.detour.markerGap;
   const steps = detourSteps(types);
   // Não ultrapassa a faixa útil do corredor, seja qual for o obstáculo
   const lateral = Math.min(steps * STEP_LATERAL, MAX_LATERAL_ABS - Math.abs(laneX));
   const targetX = laneX + side * lateral;
 
-  // Comprimento da transição: o pico de inclinação do smoothstep é 1,5x a
-  // média, então o avanço necessário para respeitar a guinada máxima é
-  // 1,5 * lateral / tan(guinada).
-  const maxYaw = THREE.MathUtils.degToRad(MAX_DETOUR_YAW_DEG);
-  const shiftRun = (1.5 * lateral) / Math.tan(maxYaw);
-  // Já deslocado um pouco antes de emparelhar com o obstáculo
-  const reachZ = obstacleZ - 1.2;
-  const shiftStartZ = Math.max(startZ + 1.5, reachZ - shiftRun);
+  const t1Z = obstacleZ - gap; // início do desvio
+  const t2Z = obstacleZ + gap; // desvio completo
 
   const path = [];
   // Distribui pontos a cada ~1,5 m; `skipFirst` evita repetir a emenda
@@ -80,28 +66,22 @@ function buildDetourGeometry(scenario, { laneX, startZ, types }) {
     }
   };
 
-  // 1) aproximação reta na faixa inicial
-  pushStraight(laneX, startZ, shiftStartZ, false);
-  // 2) transição suave (smoothstep) até a nova faixa
-  const shiftPoints = 20;
+  // 1) aproximação reta até T1
+  pushStraight(laneX, startZ, t1Z, false);
+  // 2) desvio suave de T1 a T2
+  const shiftPoints = 16;
   for (let i = 1; i <= shiftPoints; i++) {
     const t = i / shiftPoints;
     const s = t * t * (3 - 2 * t);
-    path.push([laneX + side * lateral * s, 0, shiftStartZ + (reachZ - shiftStartZ) * t]);
+    path.push([laneX + side * lateral * s, 0, t1Z + (t2Z - t1Z) * t]);
   }
-  // 3) segue reto na nova faixa
-  pushStraight(targetX, reachZ, endZ, true);
+  // 3) segue reto na nova faixa (não retorna ao centro)
+  pushStraight(targetX, t2Z, endZ, true);
 
-  // T1 e T2 são os instantes de referência do protocolo: ficam a uma distância
-  // fixa ANTES e DEPOIS do obstáculo, independentemente de onde o deslizamento
-  // lateral começa. Ficam sobre a trajetória, acompanhando o x dela naquele z.
-  const gap = scenario.detour.markerGap === undefined ? 1.5 : scenario.detour.markerGap;
-  const t1Z = obstacleZ - gap;
-  const t2Z = obstacleZ + gap;
   const markers = [
     { id: 'START', pos: [laneX, 0, startZ] },
-    { id: 'T1', pos: [xAtZ(path, t1Z), 0, t1Z] },
-    { id: 'T2', pos: [xAtZ(path, t2Z), 0, t2Z] },
+    { id: 'T1', pos: [laneX, 0, t1Z] },
+    { id: 'T2', pos: [targetX, 0, t2Z] },
     { id: 'END', pos: [targetX, 0, endZ] },
   ];
 
@@ -109,8 +89,8 @@ function buildDetourGeometry(scenario, { laneX, startZ, types }) {
     path,
     markers,
     // Curso original, que seguiria reto por cima do obstáculo
-    ghost: [[laneX, 0, shiftStartZ], [laneX, 0, obstacleZ + 2.5]],
-    detourZ: [shiftStartZ, reachZ],
+    ghost: [[laneX, 0, t1Z], [laneX, 0, obstacleZ + 2.5]],
+    detourZ: [t1Z, t2Z],
     detourInfo: { steps, lateral },
   };
 }

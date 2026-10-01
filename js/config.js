@@ -127,16 +127,12 @@ export const MIN_DETOUR_STEPS = 2;  // "basicamente uns dois passos para o lado"
 export const MAX_DETOUR_STEPS = 4;  // objetos maiores exigem mais passos
 export const BODY_HALF_WIDTH = 0.22; // meia largura do participante
 export const DETOUR_MARGIN = 0.12;   // folga mínima ao passar pelo objeto
-// Guinada máxima admitida durante a manobra: quanto menor, mais longo o trecho
-// de transição e mais estável fica o enquadramento da câmera.
-export const MAX_DETOUR_YAW_DEG = 10;
-
-// Quanto o corpo acompanha a direção da trajetória durante o desvio. Perto de
-// zero, o participante desliza para o lado mantendo tronco e câmera apontados
-// para a frente do corredor, em vez de girar e caminhar na diagonal — é assim
-// que se faz para o enquadramento não balançar. Curvas de verdade (como as do
-// supermercado complexo) seguem a tangente integralmente.
-export const DETOUR_YAW_FOLLOW = 0.15;
+// Quanto o corpo acompanha a direção da trajetória durante o desvio. Abaixo de
+// 1, o participante mantém tronco e câmera mais apontados para a frente do
+// corredor em vez de girar e caminhar na diagonal — é o que mantém o
+// enquadramento estável. Curvas de verdade (como as do supermercado complexo)
+// seguem a tangente integralmente.
+export const DETOUR_YAW_FOLLOW = 0.35;
 export const MAX_LATERAL_ABS = 2.1;  // limite lateral útil do corredor
 
 // Ambientes disponíveis no seletor. O layout do experimento (largura útil,
